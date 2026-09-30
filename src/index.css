@@ -1,1 +1,357 @@
 @import "tailwindcss";
+
+/* ========================================================================= */
+/* WINLOCK USB - MULTI-THEME ENGINE (DARK / LIGHT / SYSTEM) & PRINT STYLES   */
+/* ========================================================================= */
+
+:root, [data-theme="dark"], html.dark {
+  color-scheme: dark;
+}
+
+[data-theme="light"], html.light {
+  color-scheme: light;
+}
+
+/* ========================================================================= */
+/* LIGHT THEME: HIGH-CONTRAST ACCESSIBILITY & CRYSTAL-CLEAR READABILITY      */
+/* ========================================================================= */
+
+/* Root & Global Page Canvas */
+html.light,
+html.light body,
+[data-theme="light"],
+[data-theme="light"] body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* 1. BACKGROUNDS (Containers, Panels, Sidebars, Cards, Modals) */
+html.light aside,
+[data-theme="light"] aside,
+html.light header,
+[data-theme="light"] header,
+html.light [class*="bg-slate-900"],
+[data-theme="light"] [class*="bg-slate-900"] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Page canvas and nested card backgrounds */
+html.light [class*="bg-slate-950"],
+[data-theme="light"] [class*="bg-slate-950"] {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Secondary controls, stat chips, table headers, input backgrounds */
+html.light [class*="bg-slate-800"],
+[data-theme="light"] [class*="bg-slate-800"] {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+
+/* Interactive Hovers */
+html.light [class*="hover:bg-slate-800"]:hover,
+[data-theme="light"] [class*="hover:bg-slate-800"]:hover,
+html.light [class*="hover:bg-slate-700"]:hover,
+[data-theme="light"] [class*="hover:bg-slate-700"]:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* 2. BORDERS & DIVIDERS (Subtle yet cleanly visible) */
+html.light [class*="border-slate-900"],
+[data-theme="light"] [class*="border-slate-900"],
+html.light [class*="border-slate-800"],
+[data-theme="light"] [class*="border-slate-800"],
+html.light [class*="border-slate-700"],
+[data-theme="light"] [class*="border-slate-700"] {
+  border-color: #e2e8f0 !important;
+}
+
+html.light hr,
+[data-theme="light"] hr {
+  border-color: #e2e8f0 !important;
+}
+
+/* 3. TYPOGRAPHY: STRICT READABILITY & HIGH WCAG AA CONTRAST */
+/* Headings, Bold Titles & Critical Labels */
+html.light [class*="text-slate-100"],
+[data-theme="light"] [class*="text-slate-100"],
+html.light [class*="text-slate-200"],
+[data-theme="light"] [class*="text-slate-200"] {
+  color: #0f172a !important;
+}
+
+/* Body Text & Subtitles */
+html.light [class*="text-slate-300"],
+[data-theme="light"] [class*="text-slate-300"] {
+  color: #1e293b !important;
+}
+
+/* Section Rubrics (e.g. 'SUPERVISION & CONTRÔLE'), Table Headers, Form Labels */
+html.light [class*="text-slate-400"],
+[data-theme="light"] [class*="text-slate-400"] {
+  color: #334155 !important; /* Deep Slate-700 for crystal-clear readability */
+  font-weight: 500;
+}
+
+/* Subtle Metadata, Timestamps, Footnotes */
+html.light [class*="text-slate-500"],
+[data-theme="light"] [class*="text-slate-500"] {
+  color: #475569 !important; /* Slate-600 */
+}
+
+/* Hover text state */
+html.light [class*="hover:text-white"]:hover,
+[data-theme="light"] [class*="hover:text-white"]:hover {
+  color: #0f172a !important;
+}
+
+/* 4. DOMAIN STATUS BADGES & ACCENT COLORS (NO WASHED-OUT PASTELS) */
+/* CYAN (Tech, Whitelist, General Info) */
+html.light [class*="text-cyan-400"],
+[data-theme="light"] [class*="text-cyan-400"],
+html.light [class*="text-cyan-300"],
+[data-theme="light"] [class*="text-cyan-300"] {
+  color: #0369a1 !important; /* Deep Sky-700 (contrast > 6:1) */
+}
+
+html.light [class*="bg-cyan-950"],
+[data-theme="light"] [class*="bg-cyan-950"],
+html.light [class*="bg-cyan-900"],
+[data-theme="light"] [class*="bg-cyan-900"],
+html.light [class*="bg-cyan-500/10"],
+[data-theme="light"] [class*="bg-cyan-500/10"],
+html.light [class*="bg-cyan-500/20"],
+[data-theme="light"] [class*="bg-cyan-500/20"] {
+  background-color: #f0f9ff !important;
+  color: #0369a1 !important;
+  border-color: #bae6fd !important;
+}
+
+/* EMERALD (Security Verified, Safe HID Mouse/Keyboard, Allowed) */
+html.light [class*="text-emerald-400"],
+[data-theme="light"] [class*="text-emerald-400"],
+html.light [class*="text-emerald-300"],
+[data-theme="light"] [class*="text-emerald-300"] {
+  color: #047857 !important; /* Deep Emerald-700 (contrast > 5.5:1) */
+}
+
+html.light [class*="bg-emerald-950"],
+[data-theme="light"] [class*="bg-emerald-950"],
+html.light [class*="bg-emerald-900"],
+[data-theme="light"] [class*="bg-emerald-900"],
+html.light [class*="bg-emerald-500/15"],
+[data-theme="light"] [class*="bg-emerald-500/15"],
+html.light [class*="bg-emerald-500/20"],
+[data-theme="light"] [class*="bg-emerald-500/20"] {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+
+/* ROSE (USB Blocked, High Risk, Critical Alerts) */
+html.light [class*="text-rose-400"],
+[data-theme="light"] [class*="text-rose-400"],
+html.light [class*="text-rose-300"],
+[data-theme="light"] [class*="text-rose-300"] {
+  color: #be123c !important; /* Deep Rose-700 (contrast > 6:1) */
+}
+
+html.light [class*="bg-rose-950"],
+[data-theme="light"] [class*="bg-rose-950"],
+html.light [class*="bg-rose-900"],
+[data-theme="light"] [class*="bg-rose-900"],
+html.light [class*="bg-rose-500/15"],
+[data-theme="light"] [class*="bg-rose-500/15"],
+html.light [class*="bg-rose-500/20"],
+[data-theme="light"] [class*="bg-rose-500/20"] {
+  background-color: #fff1f2 !important;
+  color: #be123c !important;
+  border-color: #fecdd3 !important;
+}
+
+/* AMBER (Read-Only Mode, Warnings, Moderate Risk) */
+html.light [class*="text-amber-400"],
+[data-theme="light"] [class*="text-amber-400"],
+html.light [class*="text-amber-300"],
+[data-theme="light"] [class*="text-amber-300"] {
+  color: #b45309 !important; /* Rich Amber-700 (contrast > 5:1) */
+}
+
+html.light [class*="bg-amber-950"],
+[data-theme="light"] [class*="bg-amber-950"],
+html.light [class*="bg-amber-900"],
+[data-theme="light"] [class*="bg-amber-900"],
+html.light [class*="bg-amber-500/15"],
+[data-theme="light"] [class*="bg-amber-500/15"] {
+  background-color: #fffbeb !important;
+  color: #b45309 !important;
+  border-color: #fde68a !important;
+}
+
+/* INDIGO (ProductID, Execution Restrictions, System Services) */
+html.light [class*="text-indigo-400"],
+[data-theme="light"] [class*="text-indigo-400"],
+html.light [class*="text-indigo-300"],
+[data-theme="light"] [class*="text-indigo-300"] {
+  color: #4338ca !important; /* Deep Indigo-700 (contrast > 6.5:1) */
+}
+
+html.light [class*="bg-indigo-950"],
+[data-theme="light"] [class*="bg-indigo-950"],
+html.light [class*="bg-indigo-900"],
+[data-theme="light"] [class*="bg-indigo-900"],
+html.light [class*="bg-indigo-500/15"],
+[data-theme="light"] [class*="bg-indigo-500/15"] {
+  background-color: #eef2ff !important;
+  color: #4338ca !important;
+  border-color: #c7d2fe !important;
+}
+
+/* 5. FORM INPUTS & SEARCH CONTROLS */
+html.light input,
+html.light textarea,
+html.light select,
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder,
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #64748b !important;
+}
+
+html.light input:focus,
+html.light textarea:focus,
+html.light select:focus,
+[data-theme="light"] input:focus,
+[data-theme="light"] textarea:focus,
+[data-theme="light"] select:focus {
+  border-color: #0284c7 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2) !important;
+}
+
+/* 6. DATA TABLES & INVENTORY LISTS */
+html.light thead tr,
+[data-theme="light"] thead tr {
+  background-color: #f8fafc !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+html.light thead th,
+[data-theme="light"] thead th {
+  color: #334155 !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+html.light tbody tr,
+[data-theme="light"] tbody tr {
+  border-bottom-color: #e2e8f0 !important;
+}
+
+html.light tbody tr:hover,
+[data-theme="light"] tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* 7. SIDEBAR NAVIGATION & ACTIVE ITEMS */
+/* Active Nav Item: Distinctive Corporate Blue */
+html.light aside button[class*="bg-cyan-500"],
+[data-theme="light"] aside button[class*="bg-cyan-500"] {
+  background-color: #0284c7 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.25) !important;
+}
+
+html.light aside button[class*="bg-cyan-500"] svg,
+[data-theme="light"] aside button[class*="bg-cyan-500"] svg {
+  color: #ffffff !important;
+}
+
+html.light aside button[class*="bg-cyan-500"] div,
+[data-theme="light"] aside button[class*="bg-cyan-500"] div {
+  color: #ffffff !important;
+}
+
+html.light aside button[class*="bg-cyan-500"] div[class*="text-slate-800"],
+[data-theme="light"] aside button[class*="bg-cyan-500"] div[class*="text-slate-800"],
+html.light aside button[class*="bg-cyan-500"] div[class*="text-slate-400"],
+[data-theme="light"] aside button[class*="bg-cyan-500"] div[class*="text-slate-400"] {
+  color: #e0f2fe !important;
+}
+
+/* Badge on active nav item */
+html.light aside button[class*="bg-cyan-500"] span[class*="font-mono"],
+[data-theme="light"] aside button[class*="bg-cyan-500"] span[class*="font-mono"] {
+  background-color: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+/* Inactive Nav Items */
+html.light aside button[class*="text-slate-300"],
+[data-theme="light"] aside button[class*="text-slate-300"] {
+  color: #334155 !important;
+}
+
+html.light aside button[class*="text-slate-300"]:hover,
+[data-theme="light"] aside button[class*="text-slate-300"]:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Section Group Headings in Sidebar */
+html.light aside [class*="tracking-wider"],
+[data-theme="light"] aside [class*="tracking-wider"] {
+  color: #1e293b !important;
+  font-weight: 700 !important;
+}
+
+/* 8. ELEVATION & SHADOWS */
+html.light [class*="shadow-xl"],
+[data-theme="light"] [class*="shadow-xl"],
+html.light [class*="shadow-2xl"],
+[data-theme="light"] [class*="shadow-2xl"] {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 9. PRINT STYLES */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  header,
+  aside,
+  nav,
+  .no-print,
+  button:not(.print-include) {
+    display: none !important;
+  }
+
+  main {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-page {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    page-break-after: always;
+  }
+}

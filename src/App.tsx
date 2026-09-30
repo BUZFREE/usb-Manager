@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
 import { DashboardView } from './components/DashboardView';
 import { MonoposteView } from './components/MonoposteView';
 import { ReseauView } from './components/ReseauView';
@@ -13,12 +14,14 @@ import { UsbForensicsView } from './components/UsbForensicsView';
 import { GpoScriptGeneratorView } from './components/GpoScriptGeneratorView';
 import { WhitelistView } from './components/WhitelistView';
 import { UsbAuditView } from './components/UsbAuditView';
+import { ReportsPrintCenterView } from './components/ReportsPrintCenterView';
 import { PolicyMode, NetworkComputer, DeploymentLog } from './types/usbPolicy';
 import { Shield, CheckCircle2 } from 'lucide-react';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [policyMode, setPolicyMode] = useState<PolicyMode>('BLOCK_ALL');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [lastAppliedTime, setLastAppliedTime] = useState<string>(
     new Date().toLocaleTimeString('fr-FR')
   );
@@ -140,73 +143,95 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-950">
-      {/* Top Header */}
-      <Header
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex font-sans selection:bg-cyan-500 selection:text-slate-950">
+      {/* Left Sidebar Navigation Menu */}
+      <Sidebar
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
         policyMode={policyMode}
         onRefreshStatus={() => setLastAppliedTime(new Date().toLocaleTimeString('fr-FR'))}
+        isOpenMobile={isMobileSidebarOpen}
+        setIsOpenMobile={setIsMobileSidebarOpen}
+        computersCount={computers.length}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {currentTab === 'dashboard' && (
-          <DashboardView
-            policyMode={policyMode}
-            onApplyPolicy={handleApplyPolicy}
-          />
-        )}
+      {/* Main Content Area (offset by sidebar width on desktop) */}
+      <div className="flex-1 flex flex-col min-w-0 lg:pl-72 transition-all duration-300">
+        {/* Top Header */}
+        <Header
+          currentTab={currentTab}
+          setCurrentTab={setCurrentTab}
+          policyMode={policyMode}
+          onRefreshStatus={() => setLastAppliedTime(new Date().toLocaleTimeString('fr-FR'))}
+          onToggleSidebarMobile={() => setIsMobileSidebarOpen((prev) => !prev)}
+        />
 
-        {currentTab === 'monoposte' && (
-          <MonoposteView
-            policyMode={policyMode}
-            setPolicyMode={setPolicyMode}
-            onApplyPolicy={handleApplyPolicy}
-            lastAppliedTime={lastAppliedTime}
-          />
-        )}
+        {/* View Content */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {currentTab === 'dashboard' && (
+            <DashboardView
+              policyMode={policyMode}
+              onApplyPolicy={handleApplyPolicy}
+            />
+          )}
 
-        {currentTab === 'reseau' && (
-          <ReseauView
-            computers={computers}
-            setComputers={setComputers}
-            deploymentLogs={deploymentLogs}
-            setDeploymentLogs={setDeploymentLogs}
-          />
-        )}
+          {currentTab === 'monoposte' && (
+            <MonoposteView
+              policyMode={policyMode}
+              setPolicyMode={setPolicyMode}
+              onApplyPolicy={handleApplyPolicy}
+              lastAppliedTime={lastAppliedTime}
+            />
+          )}
 
-        {currentTab === 'python' && <PythonEngineView />}
+          {currentTab === 'reseau' && (
+            <ReseauView
+              computers={computers}
+              setComputers={setComputers}
+              deploymentLogs={deploymentLogs}
+              setDeploymentLogs={setDeploymentLogs}
+            />
+          )}
 
-        {currentTab === 'forensics' && <UsbForensicsView />}
+          {currentTab === 'python' && <PythonEngineView />}
 
-        {currentTab === 'scripts' && <GpoScriptGeneratorView />}
+          {currentTab === 'forensics' && <UsbForensicsView />}
 
-        {currentTab === 'whitelist' && <WhitelistView />}
+          {currentTab === 'scripts' && <GpoScriptGeneratorView />}
 
-        {currentTab === 'audit' && <UsbAuditView />}
-      </main>
+          {currentTab === 'whitelist' && <WhitelistView />}
 
-      {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 py-6 mt-12 text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-cyan-400" />
-            <span className="text-slate-300 font-medium">WinLock USB & GPO Manager</span>
-            <span>—</span>
-            <span>Suite Python 3.12 (winreg, ctypes Win32, pywin32, WMI) pour Windows 10, 11 et Windows Server</span>
+          {currentTab === 'audit' && <UsbAuditView />}
+
+          {currentTab === 'reports' && (
+            <ReportsPrintCenterView
+              policyMode={policyMode}
+              computers={computers}
+            />
+          )}
+        </main>
+
+        {/* Footer */}
+        <footer className="border-t border-slate-900 bg-slate-950/80 py-6 mt-12 text-xs text-slate-500">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-cyan-400" />
+              <span className="text-slate-300 font-medium">WinLock USB & GPO Manager</span>
+              <span>—</span>
+              <span>Suite Python 3.12 (winreg, ctypes Win32, pywin32, WMI) pour Windows 10, 11 et Windows Server</span>
+            </div>
+
+            <div className="flex items-center gap-4 text-slate-400">
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                Souris & Clavier HID Inviolables
+              </span>
+              <span>•</span>
+              <span>Watchdog en temps réel & Forensics intégrés</span>
+            </div>
           </div>
-
-          <div className="flex items-center gap-4 text-slate-400">
-            <span className="flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              Souris & Clavier HID Inviolables
-            </span>
-            <span>•</span>
-            <span>Watchdog en temps réel & Forensics intégrés</span>
-          </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
     </div>
   );
 }

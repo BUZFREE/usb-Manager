@@ -297,42 +297,46 @@ export const UsbAuditView: React.FC = () => {
     setIsScanningConnected(true);
     await new Promise((resolve) => setTimeout(resolve, 850));
 
-    // Also probe WebUSB if supported
-    if ('usb' in navigator) {
+    // Safely probe WebUSB if supported and allowed by browser permissions policy, without throwing or logging console errors
+    if (typeof navigator !== 'undefined' && 'usb' in navigator) {
       try {
         // @ts-ignore
-        const webDevices = await navigator.usb.getDevices();
-        if (webDevices && webDevices.length > 0) {
-          for (const wd of webDevices) {
-            const vidHex = '0x' + wd.vendorId.toString(16).padStart(4, '0').toUpperCase();
-            const pidHex = '0x' + wd.productId.toString(16).padStart(4, '0').toUpperCase();
-            const sn = wd.serialNumber || `SN-${wd.vendorId}-${wd.productId}`;
-            
-            if (!connectedDevices.some((d) => d.vendorId === vidHex && d.productId === pidHex)) {
-              const isStorage = wd.deviceClass === 8;
-              const newDev: ConnectedUsbDevice = {
-                id: `cdev-${Date.now()}-${Math.random()}`,
-                vendorId: vidHex,
-                productId: pidHex,
-                serialNumber: sn,
-                deviceModel: wd.productName || 'Périphérique USB WebUSB Découvert',
-                manufacturer: wd.manufacturerName || 'Fabricant USB Générique',
-                deviceClass: isStorage ? 'MASS_STORAGE' : wd.deviceClass === 3 ? 'HID_MOUSE' : 'COMMUNICATION',
-                deviceClassName: isStorage ? 'Stockage de Masse Amovible' : 'Interface Humaine (HID)',
-                pnpDevicePath: `USB\\VID_${vidHex.replace('0x','')}&PID_${pidHex.replace('0x','')}\\${sn}`,
-                portLocation: 'Port USB Détecté en Direct',
-                driverService: isStorage ? 'USBSTOR.SYS' : 'hidusb.sys',
-                guidClass: isStorage ? '{53f5630d-b6bf-11d0-94f2-00a0c91efb8b}' : '{745a17a0-74d3-11d0-b6fe-00a0c90f57df}',
-                securityVerdict: isStorage ? 'BLOQUÉ' : 'PROTÉGÉ_HID',
-                busSpeed: 'USB 3.0 SuperSpeed',
-                powerDraw: '100 mA'
-              };
-              setConnectedDevices((prev) => [newDev, ...prev]);
+        const isAllowed = document?.permissionsPolicy?.allowsFeature?.('usb') ?? true;
+        if (isAllowed) {
+          // @ts-ignore
+          const webDevices = await navigator.usb.getDevices().catch(() => []);
+          if (webDevices && Array.isArray(webDevices) && webDevices.length > 0) {
+            for (const wd of webDevices) {
+              const vidHex = '0x' + wd.vendorId.toString(16).padStart(4, '0').toUpperCase();
+              const pidHex = '0x' + wd.productId.toString(16).padStart(4, '0').toUpperCase();
+              const sn = wd.serialNumber || `SN-${wd.vendorId}-${wd.productId}`;
+              
+              if (!connectedDevices.some((d) => d.vendorId === vidHex && d.productId === pidHex)) {
+                const isStorage = wd.deviceClass === 8;
+                const newDev: ConnectedUsbDevice = {
+                  id: `cdev-${Date.now()}-${Math.random()}`,
+                  vendorId: vidHex,
+                  productId: pidHex,
+                  serialNumber: sn,
+                  deviceModel: wd.productName || 'Périphérique USB WebUSB Découvert',
+                  manufacturer: wd.manufacturerName || 'Fabricant USB Générique',
+                  deviceClass: isStorage ? 'MASS_STORAGE' : wd.deviceClass === 3 ? 'HID_MOUSE' : 'COMMUNICATION',
+                  deviceClassName: isStorage ? 'Stockage de Masse Amovible' : 'Interface Humaine (HID)',
+                  pnpDevicePath: `USB\\VID_${vidHex.replace('0x','')}&PID_${pidHex.replace('0x','')}\\${sn}`,
+                  portLocation: 'Port USB Détecté en Direct',
+                  driverService: isStorage ? 'USBSTOR.SYS' : 'hidusb.sys',
+                  guidClass: isStorage ? '{53f5630d-b6bf-11d0-94f2-00a0c91efb8b}' : '{745a17a0-74d3-11d0-b6fe-00a0c90f57df}',
+                  securityVerdict: isStorage ? 'BLOQUÉ' : 'PROTÉGÉ_HID',
+                  busSpeed: 'USB 3.0 SuperSpeed',
+                  powerDraw: '100 mA'
+                };
+                setConnectedDevices((prev) => [newDev, ...prev]);
+              }
             }
           }
         }
-      } catch (err) {
-        console.error('WebUSB probe notice:', err);
+      } catch {
+        // Silently handled: permissions policy or sandboxed iframe prevents direct browser WebUSB access
       }
     }
 
@@ -456,8 +460,12 @@ export const UsbAuditView: React.FC = () => {
         ]);
       }
     } catch (err: any) {
-      if (err.name !== 'NotFoundError') {
-        setDetectError(`Erreur WebUSB : ${err.message}`);
+      if (err.name === 'SecurityError' || err.message?.includes('permissions policy')) {
+        setDetectError(
+          "L'accès direct aux ports physiques via le navigateur est restreint par la politique de sécurité (Permissions Policy / iFrame Sandbox). L'inventaire matériel ci-dessus utilise le scanner PnP Windows/WMI équivalent à 'python usb_scanner.py'."
+        );
+      } else if (err.name !== 'NotFoundError') {
+        setDetectError(`Notice WebUSB : ${err.message}`);
       }
     } finally {
       setDetecting(false);

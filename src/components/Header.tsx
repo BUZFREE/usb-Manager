@@ -4,16 +4,23 @@ import {
   ShieldAlert, 
   ShieldCheck, 
   Download, 
-  Laptop, 
-  Globe, 
-  FileCode, 
-  ListFilter, 
-  Cpu, 
   RefreshCw,
+  Printer,
+  Moon,
+  Sun,
+  Monitor,
+  Menu,
+  Activity,
+  Laptop,
+  Globe,
+  Terminal,
   Search,
-  Terminal
+  Cpu,
+  ListFilter,
+  FileCode
 } from 'lucide-react';
 import { PolicyMode } from '../types/usbPolicy';
+import { useTheme } from '../context/ThemeContext';
 import { generatePythonProjectZip, downloadBlob } from '../utils/zipGenerator';
 
 interface HeaderProps {
@@ -21,6 +28,7 @@ interface HeaderProps {
   setCurrentTab: (tab: string) => void;
   policyMode: PolicyMode;
   onRefreshStatus?: () => void;
+  onToggleSidebarMobile?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,7 +36,9 @@ export const Header: React.FC<HeaderProps> = ({
   setCurrentTab,
   policyMode,
   onRefreshStatus,
+  onToggleSidebarMobile,
 }) => {
+  const { theme, setTheme } = useTheme();
   const [isZipping, setIsZipping] = useState(false);
 
   const handleDownloadZip = async () => {
@@ -43,27 +53,52 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const getTabLabel = () => {
+    switch (currentTab) {
+      case 'dashboard':
+        return 'Tableau de Bord (Temps Réel)';
+      case 'monoposte':
+        return 'Monoposte (Poste Local)';
+      case 'reseau':
+        return 'Réseau & Active Directory';
+      case 'python':
+        return 'Moteur & Suite Python (8 Outils)';
+      case 'forensics':
+        return 'Forensics & Event Logs (IDs 20001, 20003)';
+      case 'audit':
+        return 'Scanner & Audit Matériel USB';
+      case 'whitelist':
+        return 'Liste Blanche (Exceptions)';
+      case 'scripts':
+        return 'GPO & Scripts PowerShell / .REG';
+      case 'reports':
+        return "Centre d'Impression & Rapports Officiels";
+      default:
+        return 'WinLock USB Manager';
+    }
+  };
+
   const getStatusBadge = () => {
     switch (policyMode) {
       case 'BLOCK_ALL':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30">
             <ShieldAlert className="w-3.5 h-3.5" />
-            Stockage USB : BLOQUÉ
+            Stockage : BLOQUÉ
           </span>
         );
       case 'READ_ONLY':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
             <Shield className="w-3.5 h-3.5" />
-            Stockage USB : LECTURE SEULE
+            Stockage : LECTURE SEULE
           </span>
         );
       case 'BLOCK_EXECUTE':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
             <Shield className="w-3.5 h-3.5" />
-            Exécution USB : INTERDITE
+            Stockage : EXEC INTERDITE
           </span>
         );
       case 'UNBLOCKED':
@@ -71,162 +106,102 @@ export const Header: React.FC<HeaderProps> = ({
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
             <ShieldCheck className="w-3.5 h-3.5" />
-            Stockage USB : AUTORISÉ
+            Stockage : DÉBLOQUÉ
           </span>
         );
     }
   };
 
   return (
-    <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
+    <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between py-3.5">
-          {/* Brand */}
+        <div className="flex items-center justify-between py-3">
+          {/* Left: Mobile hamburger & Breadcrumb title */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/20 text-white font-bold">
-              <Shield className="w-5 h-5 text-white" />
-            </div>
+            {onToggleSidebarMobile && (
+              <button
+                onClick={onToggleSidebarMobile}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg lg:hidden"
+                title="Ouvrir le menu de navigation"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
+
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold text-slate-100 tracking-tight">
-                  WinLock USB & GPO Manager
-                </h1>
-                <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider rounded bg-cyan-950 text-cyan-400 border border-cyan-800/50">
-                  Python 3.12 / winreg / ctypes
-                </span>
+                <span className="text-xs text-slate-400 hidden sm:inline">WinLock USB &rsaquo;</span>
+                <h2 className="text-sm sm:text-base font-bold text-slate-100 tracking-tight">
+                  {getTabLabel()}
+                </h2>
               </div>
-              <p className="text-xs text-slate-400">
-                Suite Python Universelle • Compatible tous Windows (11, 10, 8, 7, XP & Server) • Souris & Clavier Protégés
+              <p className="text-[11px] text-slate-400 hidden sm:block">
+                Windows 10, 11 & Windows Server • Souris & Clavier HID Inviolables
               </p>
             </div>
           </div>
 
-          {/* Quick status & Actions */}
+          {/* Right: Actions, Status & Theme Switcher */}
           <div className="flex items-center gap-2.5">
             {getStatusBadge()}
 
+            {/* Quick Print Center shortcut button */}
+            <button
+              onClick={() => setCurrentTab('reports')}
+              className={`p-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+                currentTab === 'reports'
+                  ? 'bg-cyan-500 text-slate-950 font-bold shadow'
+                  : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700'
+              }`}
+              title="Accéder au Centre d'Impression des États"
+            >
+              <Printer className="w-4 h-4 text-cyan-400" />
+              <span className="hidden md:inline">Imprimer États</span>
+            </button>
+
+            {/* Refresh policy status button */}
             {onRefreshStatus && (
               <button
                 onClick={onRefreshStatus}
                 title="Rafraîchir l'audit des stratégies"
-                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
             )}
 
-            <button
-              onClick={handleDownloadZip}
-              disabled={isZipping}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 transition shadow-sm active:scale-95 disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" />
-              {isZipping ? 'Création du ZIP...' : 'Télécharger Suite Python (.zip)'}
-            </button>
+            {/* Top Quick Theme Switcher Icons */}
+            <div className="hidden sm:flex items-center bg-slate-800/80 p-0.5 rounded-xl border border-slate-700/80">
+              <button
+                onClick={() => setTheme('dark')}
+                className={`p-1.5 rounded-lg text-xs transition ${
+                  theme === 'dark' ? 'bg-slate-900 text-cyan-400 shadow-sm' : 'text-slate-400 hover:text-white'
+                }`}
+                title="Mode Sombre"
+              >
+                <Moon className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setTheme('light')}
+                className={`p-1.5 rounded-lg text-xs transition ${
+                  theme === 'light' ? 'bg-white text-amber-500 shadow-sm' : 'text-slate-400 hover:text-white'
+                }`}
+                title="Mode Clair"
+              >
+                <Sun className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setTheme('system')}
+                className={`p-1.5 rounded-lg text-xs transition ${
+                  theme === 'system' ? 'bg-slate-900 text-cyan-300 shadow-sm' : 'text-slate-400 hover:text-white'
+                }`}
+                title="Mode Système Auto"
+              >
+                <Monitor className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Navigation Tabs */}
-        <nav className="flex items-center gap-1 overflow-x-auto scrollbar-none border-t border-slate-800/80 pt-1 -mb-px text-xs sm:text-sm">
-          <button
-            onClick={() => setCurrentTab('dashboard')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 font-medium border-b-2 transition-colors whitespace-nowrap ${
-              currentTab === 'dashboard'
-                ? 'border-cyan-400 text-cyan-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-            }`}
-          >
-            <span className="relative flex h-2 w-2 mr-0.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
-            </span>
-            Tableau de Bord (Temps Réel)
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('monoposte')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 font-medium border-b-2 transition-colors whitespace-nowrap ${
-              currentTab === 'monoposte'
-                ? 'border-cyan-400 text-cyan-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-            }`}
-          >
-            <Laptop className="w-4 h-4" />
-            Monoposte (Local)
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('reseau')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 font-medium border-b-2 transition-colors whitespace-nowrap ${
-              currentTab === 'reseau'
-                ? 'border-cyan-400 text-cyan-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            Réseau & Active Directory
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('python')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 font-medium border-b-2 transition-colors whitespace-nowrap ${
-              currentTab === 'python'
-                ? 'border-cyan-400 text-cyan-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-            }`}
-          >
-            <Terminal className="w-4 h-4" />
-            Moteur & Outils Python (8)
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('forensics')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 font-medium border-b-2 transition-colors whitespace-nowrap ${
-              currentTab === 'forensics'
-                ? 'border-cyan-400 text-cyan-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-            }`}
-          >
-            <Search className="w-4 h-4" />
-            Forensics & Historique USB
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('scripts')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 font-medium border-b-2 transition-colors whitespace-nowrap ${
-              currentTab === 'scripts'
-                ? 'border-cyan-400 text-cyan-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-            }`}
-          >
-            <FileCode className="w-4 h-4" />
-            GPO & PowerShell / REG
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('whitelist')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 font-medium border-b-2 transition-colors whitespace-nowrap ${
-              currentTab === 'whitelist'
-                ? 'border-cyan-400 text-cyan-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-            }`}
-          >
-            <ListFilter className="w-4 h-4" />
-            Liste Blanche (Exceptions)
-          </button>
-
-          <button
-            onClick={() => setCurrentTab('audit')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 font-medium border-b-2 transition-colors whitespace-nowrap ${
-              currentTab === 'audit'
-                ? 'border-cyan-400 text-cyan-400 bg-slate-800/40'
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-            }`}
-          >
-            <Cpu className="w-4 h-4" />
-            Audit & Diagnostic Matériel
-          </button>
-        </nav>
       </div>
     </header>
   );

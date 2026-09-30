@@ -222,6 +222,119 @@ foreach ($target in $ComputerName) {
 [HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\USBSTOR]
 "Start"=dword:00000003
 `
+  },
+  {
+    name: 'Bloquer_USB_Immediat.bat',
+    extension: 'bat',
+    description: 'Script Batch Windows 1-Clic pour bloquer immédiatement le stockage USB (Exécuter en tant qu\'administrateur)',
+    category: 'registry',
+    content: `@echo off
+chcp 65001 >nul
+:: ==============================================================================
+:: WINLOCK USB - SCRIPT D'APPLICATION IMMEDIATE (CLIC DROIT -> EXECUTER EN ADMIN)
+:: ==============================================================================
+title WinLock USB - Blocage Réel Immédiat
+
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo.
+    echo ==============================================================================
+    echo [ATTENTION] CE SCRIPT NECESSITE LES DROITS D'ADMINISTRATEUR WINDOWS.
+    echo.
+    echo Pour bloquer physiquement les ports USB de cette machine :
+    echo   1. Faites un clic droit sur ce fichier 'Bloquer_USB_Immediat.bat'
+    echo   2. Cliquez sur 'Executer en tant qu'administrateur'
+    echo ==============================================================================
+    echo.
+    pause
+    exit /b 1
+)
+
+echo.
+echo ==============================================================================
+echo   WINLOCK USB : VERROUILLAGE REEL DES CLES USB ET DISQUES EXTERNES
+echo ==============================================================================
+echo.
+
+echo [1/3] Configuration des cles de registre GPO RemovableStorageDevices...
+reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices" /v "Deny_All" /t REG_DWORD /d 1 /f >nul
+reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices\\{53f5630d-b6bf-11d0-94f2-00a0c91efb8b}" /v "Deny_Read" /t REG_DWORD /d 1 /f >nul
+reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices\\{53f5630d-b6bf-11d0-94f2-00a0c91efb8b}" /v "Deny_Write" /t REG_DWORD /d 1 /f >nul
+reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices\\{53f5630d-b6bf-11d0-94f2-00a0c91efb8b}" /v "Deny_Execute" /t REG_DWORD /d 1 /f >nul
+reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices\\{6AC27878-A641-422B-BAC6-F4A9102EAC32}" /v "Deny_Read" /t REG_DWORD /d 1 /f >nul
+reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices\\{6AC27878-A641-422B-BAC6-F4A9102EAC32}" /v "Deny_Write" /t REG_DWORD /d 1 /f >nul
+
+echo [2/3] Desactivation du pilote USBSTOR (Start = 4)...
+reg add "HKLM\\SYSTEM\\CurrentControlSet\\Services\\USBSTOR" /v "Start" /t REG_DWORD /d 4 /f >nul
+
+echo [3/3] Rafraichissement immediat des strategies locales Windows...
+gpupdate /target:computer /wait:0 >nul 2>&1
+
+echo.
+echo ==============================================================================
+echo   [SUCCES TOTAL] :
+echo   - Les cles USB et disques durs externes sont DESORMAIS BLOQUES sur ce PC !
+echo   - La souris et le clavier USB restent 100%% INTACTS et OPERATIONNELS.
+echo ==============================================================================
+echo.
+pause
+`
+  },
+  {
+    name: 'Lecture_Seule_USB.bat',
+    extension: 'bat',
+    description: 'Script Batch Windows 1-Clic pour passer les clés USB en lecture seule (Anti-fuite / Anti-vol)',
+    category: 'registry',
+    content: `@echo off
+chcp 65001 >nul
+title WinLock USB - Passage en Lecture Seule
+
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo [ERREUR] Clic droit sur ce fichier -^> "Executer en tant qu'administrateur".
+    pause
+    exit /b 1
+)
+
+echo Configuration en LECTURE SEULE (Copie vers USB interdite)...
+reg delete "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices" /v "Deny_All" /f >nul 2>&1
+reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices\\{53f5630d-b6bf-11d0-94f2-00a0c91efb8b}" /v "Deny_Read" /t REG_DWORD /d 0 /f >nul
+reg add "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices\\{53f5630d-b6bf-11d0-94f2-00a0c91efb8b}" /v "Deny_Write" /t REG_DWORD /d 1 /f >nul
+reg add "HKLM\\SYSTEM\\CurrentControlSet\\Services\\USBSTOR" /v "Start" /t REG_DWORD /d 3 /f >nul
+reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\StorageDevicePolicies" /v "WriteProtect" /t REG_DWORD /d 1 /f >nul
+
+gpupdate /target:computer /wait:0 >nul 2>&1
+
+echo [SUCCES] Cles USB en mode LECTURE SEULE. Consultation permise, ecriture bloquee.
+pause
+`
+  },
+  {
+    name: 'Debloquer_USB.bat',
+    extension: 'bat',
+    description: 'Script Batch Windows 1-Clic pour réautoriser tous les ports USB',
+    category: 'registry',
+    content: `@echo off
+chcp 65001 >nul
+title WinLock USB - Déblocage USB
+
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo [ERREUR] Clic droit sur ce fichier -^> "Executer en tant qu'administrateur".
+    pause
+    exit /b 1
+)
+
+echo Retrait des restrictions USB...
+reg delete "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices" /f >nul 2>&1
+reg delete "HKLM\\SYSTEM\\CurrentControlSet\\Control\\StorageDevicePolicies" /v "WriteProtect" /f >nul 2>&1
+reg add "HKLM\\SYSTEM\\CurrentControlSet\\Services\\USBSTOR" /v "Start" /t REG_DWORD /d 3 /f >nul
+
+gpupdate /target:computer /wait:0 >nul 2>&1
+
+echo [SUCCES] Tous les ports USB sont DEBLOQUES. Acces normal retabli.
+pause
+`
   }
 ];
 

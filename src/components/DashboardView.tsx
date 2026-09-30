@@ -27,10 +27,14 @@ import {
   Laptop,
   Copy,
   Check,
-  X
+  X,
+  Download,
+  Terminal
 } from 'lucide-react';
 import { RealtimeUsbEvent, UsbPortState, SocketConnectionState, PortStatus } from '../types/dashboardTypes';
 import { PolicyMode } from '../types/usbPolicy';
+import { SCRIPT_TEMPLATES } from '../data/scriptTemplates';
+import { downloadText } from '../utils/zipGenerator';
 
 interface DashboardViewProps {
   policyMode: PolicyMode;
@@ -41,19 +45,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   policyMode,
   onApplyPolicy,
 }) => {
-  // Socket connection state
+  // Socket connection state (connects to local agent ws://127.0.0.1:8765 if running on Windows)
   const [socketState, setSocketState] = useState<SocketConnectionState>({
-    connected: true,
+    connected: false,
     serverUrl: 'ws://127.0.0.1:8765',
-    transport: 'WEBSOCKET',
+    transport: 'SIMULATION_QUEUE',
     eventsReceivedCount: 14,
     lastHeartbeat: new Date().toLocaleTimeString('fr-FR'),
-    daemonPid: 4812,
   });
 
+  const [showAgentModal, setShowAgentModal] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [selectedPort, setSelectedPort] = useState<UsbPortState | null>(null);
   const [copiedPortField, setCopiedPortField] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
 
   // Physical Ports Matrix representation of the Windows machine
   const [ports, setPorts] = useState<UsbPortState[]>([
@@ -180,50 +185,68 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     },
   ]);
 
-  // Connect to live WebSocket or fallback simulation queue
+  // Connect to live WebSocket if local Python daemon is running (ws://127.0.0.1:8765)
   useEffect(() => {
     let ws: WebSocket | null = null;
     let fallbackInterval: any = null;
+    let cancelled = false;
 
     try {
       ws = new WebSocket(socketState.serverUrl);
+      wsRef.current = ws;
 
       ws.onopen = () => {
+        if (cancelled) return;
         setSocketState((prev) => ({
           ...prev,
           connected: true,
           transport: 'WEBSOCKET',
           lastHeartbeat: new Date().toLocaleTimeString('fr-FR'),
+          daemonPid: 4812,
         }));
       };
 
       ws.onmessage = (msg) => {
-        if (isPaused) return;
+        if (cancelled || isPaused) return;
         try {
           const data = JSON.parse(msg.data);
           handleIncomingEvent(data);
-        } catch (e) {
-          console.error('Error parsing WS message:', e);
+        } catch {
+          // Ignore parse errors
         }
       };
 
       ws.onerror = () => {
-        // Fallback to active event queue simulation
+        if (cancelled) return;
         setSocketState((prev) => ({
           ...prev,
           transport: 'SIMULATION_QUEUE',
-          connected: true,
+          connected: false,
+          daemonPid: undefined,
+        }));
+      };
+
+      ws.onclose = () => {
+        if (cancelled) return;
+        setSocketState((prev) => ({
+          ...prev,
+          transport: 'SIMULATION_QUEUE',
+          connected: false,
+          daemonPid: undefined,
         }));
       };
     } catch {
-      setSocketState((prev) => ({
-        ...prev,
-        transport: 'SIMULATION_QUEUE',
-        connected: true,
-      }));
+      if (!cancelled) {
+        setSocketState((prev) => ({
+          ...prev,
+          transport: 'SIMULATION_QUEUE',
+          connected: false,
+          daemonPid: undefined,
+        }));
+      }
     }
 
-    // Background timer to maintain heartbeat and simulate subtle daemon life
+    // Timer to update timestamp
     fallbackInterval = setInterval(() => {
       setSocketState((prev) => ({
         ...prev,
@@ -232,10 +255,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }, 4000);
 
     return () => {
+      cancelled = true;
       if (ws) ws.close();
+      wsRef.current = null;
       if (fallbackInterval) clearInterval(fallbackInterval);
     };
-  }, [socketState.serverUrl, isPaused, policyMode]);
+  }, []);
 
   const handleIncomingEvent = (event: RealtimeUsbEvent) => {
     setEventQueue((prev) => [event, ...prev.slice(0, 49)]); // keep 50 max
@@ -404,19 +429,92 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Real Machine 1-Click Execution & Local Agent Banner */}
+      <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-cyan-950/40 border-2 border-cyan-500/40 rounded-2xl p-5 shadow-xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-cyan-500 text-slate-950 font-bold shrink-0 mt-0.5">
+              <Zap className="w-5 h-5 fill-current" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-100">
+                  ⚡ Appliquer Réellement sur ce PC Windows (1 Clic Immédiat)
+                </h3>
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                  socketState.connected
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                }`}>
+                  {socketState.connected ? 'Agent Local Connecté' : 'Console Web Cloud (Vercel)'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+                Pour des raisons évidentes de sécurité du navigateur (sandbox), Windows interdit formellement à tout site web distant de modifier le registre système sans action locale. 
+                Pour bloquer physiquement les clés USB de cet ordinateur : <strong>téléchargez le script .BAT ci-contre et lancez-le en tant qu'administrateur !</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                const bat = SCRIPT_TEMPLATES.find((s) => s.name === 'Bloquer_USB_Immediat.bat')?.content;
+                if (bat) downloadText(bat, 'Bloquer_USB_Immediat.bat');
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-md transition active:scale-95 flex items-center gap-1.5"
+              title="Télécharger le script Batch pour bloquer immédiatement les clés USB"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              Bloquer USB (.bat)
+            </button>
+
+            <button
+              onClick={() => {
+                const bat = SCRIPT_TEMPLATES.find((s) => s.name === 'Debloquer_USB.bat')?.content;
+                if (bat) downloadText(bat, 'Debloquer_USB.bat');
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow-md transition active:scale-95 flex items-center gap-1.5"
+              title="Télécharger le script Batch pour débloquer les ports USB"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Débloquer USB (.bat)
+            </button>
+
+            <button
+              onClick={() => setShowAgentModal(true)}
+              className="px-3 py-2 rounded-xl text-xs font-semibold text-cyan-300 bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-800/60 transition flex items-center gap-1.5"
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              Contrôle Direct (Agent Démon)
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Top Banner: Real-Time Stream Header & Live Radar Status */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-semibold ${
+                socketState.connected
+                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60'
+                  : 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
+              }`}>
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${
+                    socketState.connected ? 'bg-emerald-400' : 'bg-amber-400'
+                  } opacity-75`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                    socketState.connected ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}></span>
                 </span>
-                FLUX TEMPS RÉEL ACTIF (SOCKET & WMI DAEMON)
+                {socketState.connected ? 'AGENT LOCAL ACTIF (ws://127.0.0.1:8765)' : 'CONSOLE CLOUD (AGENT LOCAL DÉCONNECTÉ)'}
               </span>
-              <span className="text-xs text-slate-400">PID Python: {socketState.daemonPid} • Port ws://127.0.0.1:8765</span>
+              <span className="text-xs text-slate-400">
+                {socketState.connected ? `PID Agent: ${socketState.daemonPid}` : 'Simulation active • Scripts 1-Clic disponibles'}
+              </span>
             </div>
 
             <h2 className="text-2xl font-bold text-slate-100 tracking-tight flex items-center gap-2.5">
@@ -458,11 +556,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Live Service Status Strip */}
         <div className="mt-6 pt-4 border-t border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
           <div className="flex items-center gap-2 text-slate-300">
-            <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+            <Radio className={`w-4 h-4 ${socketState.connected ? 'text-emerald-400 animate-pulse' : 'text-amber-400'}`} />
             <div>
               <div className="text-[10px] text-slate-500 uppercase font-sans">Canal Socket</div>
-              <div className="font-bold text-emerald-400">
-                {socketState.transport === 'WEBSOCKET' ? 'WebSocket Connecté' : 'Queue Événements Active'}
+              <div className={`font-bold ${socketState.connected ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {socketState.connected ? 'Agent Local Connecté' : 'Mode Cloud Déconnecté'}
               </div>
             </div>
           </div>
@@ -876,6 +974,107 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200"
               >
                 Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Local Agent Connection Helper Modal */}
+      {showAgentModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <Terminal className="w-5 h-5 text-cyan-400" />
+                <h4 className="text-base font-bold text-slate-100">
+                  Comment connecter ce site web à votre PC Windows physique ?
+                </h4>
+              </div>
+              <button
+                onClick={() => setShowAgentModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800 hover:bg-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-slate-300 space-y-1">
+                <div className="font-bold text-amber-300 text-sm flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  Sécurité du Navigateur (Sandbox Windows)
+                </div>
+                <p>
+                  Un site web hébergé dans le Cloud (comme sur <strong>Vercel</strong>) s'exécute dans le bac à sable de votre navigateur (Chrome/Edge). 
+                  Pour des raisons absolues de cybersécurité, Windows <strong>interdit à tout site internet de modifier le registre ou d'arrêter des pilotes système à distance</strong> sans votre accord local.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                  <div className="font-bold text-emerald-400 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Méthode 1 : Blocage Réel Immédiat en 1 Clic (Sans rien installer)
+                  </div>
+                  <p className="text-slate-400">
+                    Téléchargez simplement le script Windows Batch et exécutez-le en tant qu'administrateur :
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      onClick={() => {
+                        const bat = SCRIPT_TEMPLATES.find((s) => s.name === 'Bloquer_USB_Immediat.bat')?.content;
+                        if (bat) downloadText(bat, 'Bloquer_USB_Immediat.bat');
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition flex items-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Télécharger Bloquer_USB_Immediat.bat
+                    </button>
+                    <button
+                      onClick={() => {
+                        const bat = SCRIPT_TEMPLATES.find((s) => s.name === 'Debloquer_USB.bat')?.content;
+                        if (bat) downloadText(bat, 'Debloquer_USB.bat');
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition flex items-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Télécharger Debloquer_USB.bat
+                    </button>
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-sans italic pt-1">
+                    Faites un clic droit sur le fichier téléchargé &rsaquo; « Exécuter en tant qu'administrateur ».
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                  <div className="font-bold text-cyan-400 flex items-center gap-2">
+                    <Zap className="w-4 h-4" />
+                    Méthode 2 : Pilotage en direct depuis cette page web (Agent Démon)
+                  </div>
+                  <p className="text-slate-400">
+                    Pour que chaque clic sur cette page Vercel applique en temps réel la politique sur votre ordinateur, lancez le démon WebSocket inclus :
+                  </p>
+                  <pre className="p-2.5 rounded bg-slate-900 border border-slate-800 font-mono text-[11px] text-cyan-300 overflow-x-auto select-all">
+{`# 1. Ouvrez un terminal administrateur (PowerShell ou CMD) :
+pip install websockets pywin32
+
+# 2. Lancez le serveur local :
+python usb_watchdog.py`}
+                  </pre>
+                  <p className="text-[11px] text-slate-400">
+                    Dès que le serveur tourne sur <code className="text-cyan-400 font-mono">ws://127.0.0.1:8765</code>, cette page web se connecte automatiquement et prend le contrôle en direct !
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-800 flex justify-end">
+              <button
+                onClick={() => setShowAgentModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition"
+              >
+                Compris, fermer
               </button>
             </div>
           </div>

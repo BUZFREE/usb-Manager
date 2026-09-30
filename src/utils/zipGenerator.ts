@@ -21,6 +21,12 @@ export async function generatePythonProjectZip(): Promise<Blob> {
   }
 
   // Windows batch launchers
+  const blockBat = SCRIPT_TEMPLATES.find(s => s.name === 'Bloquer_USB_Immediat.bat')?.content;
+  if (blockBat) root.file('Bloquer_USB_Immediat.bat', blockBat);
+
+  const unblockBat = SCRIPT_TEMPLATES.find(s => s.name === 'Debloquer_USB.bat')?.content;
+  if (unblockBat) root.file('Debloquer_USB.bat', unblockBat);
+
   const runCliBat = `@echo off
 echo ==============================================================
 echo   Lancement de WinLock USB Manager (CLI) en Administrateur

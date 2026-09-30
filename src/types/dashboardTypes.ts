@@ -40,5 +40,5 @@ export interface SocketConnectionState {
   transport: 'WEBSOCKET' | 'SIMULATION_QUEUE';
   eventsReceivedCount: number;
   lastHeartbeat: string;
-  daemonPid: number;
+  daemonPid?: number;
 }

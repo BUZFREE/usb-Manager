@@ -21,9 +21,12 @@ import {
   Layers,
   Monitor,
   Check,
-  FileText
+  FileText,
+  Download
 } from 'lucide-react';
 import { PolicyMode } from '../types/usbPolicy';
+import { SCRIPT_TEMPLATES } from '../data/scriptTemplates';
+import { downloadText } from '../utils/zipGenerator';
 
 interface MonoposteViewProps {
   policyMode: PolicyMode;
@@ -271,6 +274,97 @@ export const MonoposteView: React.FC<MonoposteViewProps> = ({
         </div>
       </div>
 
+      {/* Real Machine Instant 1-Click Execution Banner */}
+      <div className="bg-gradient-to-r from-cyan-950/40 via-slate-900 to-blue-950/40 border-2 border-cyan-500/40 rounded-2xl p-5 shadow-xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-cyan-500 text-slate-950 font-bold shrink-0 mt-0.5">
+              <Zap className="w-5 h-5 fill-current" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                ⚡ Exécution Réelle sur ce PC Windows (1 Clic Immédiat)
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Application Physique Immédiate
+                </span>
+              </h3>
+              <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+                <strong>Pourquoi les ports ne se bloquent-ils pas tout seuls depuis un site web (Vercel) ?</strong><br />
+                Pour des raisons évidentes de sécurité du navigateur (sandbox), 
+                Windows interdit formellement à tout site web distant de modifier le registre système sans action locale. 
+                Pour bloquer immédiatement vos ports USB physiques, téléchargez le script 1-clic ci-dessous et lancez-le en tant qu'administrateur !
+              </p>
+            </div>
+          </div>
+
+          {/* Direct Download Actions */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                const bat = SCRIPT_TEMPLATES.find((s) => s.name === 'Bloquer_USB_Immediat.bat')?.content;
+                if (bat) downloadText(bat, 'Bloquer_USB_Immediat.bat');
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-md transition active:scale-95 flex items-center gap-1.5"
+              title="Télécharger le script Batch pour bloquer immédiatement les clés USB"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              Bloquer USB (.bat)
+            </button>
+
+            <button
+              onClick={() => {
+                const bat = SCRIPT_TEMPLATES.find((s) => s.name === 'Lecture_Seule_USB.bat')?.content;
+                if (bat) downloadText(bat, 'Lecture_Seule_USB.bat');
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 shadow-md transition active:scale-95 flex items-center gap-1.5"
+              title="Télécharger le script Batch pour autoriser la lecture seule"
+            >
+              <FolderLock className="w-4 h-4" />
+              Lecture Seule (.bat)
+            </button>
+
+            <button
+              onClick={() => {
+                const bat = SCRIPT_TEMPLATES.find((s) => s.name === 'Debloquer_USB.bat')?.content;
+                if (bat) downloadText(bat, 'Debloquer_USB.bat');
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 shadow-md transition active:scale-95 flex items-center gap-1.5"
+              title="Télécharger le script Batch pour débloquer les ports USB"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Débloquer USB (.bat)
+            </button>
+
+            <button
+              onClick={() => {
+                const reg = SCRIPT_TEMPLATES.find((s) => s.name === 'Block_USB_Storage.reg')?.content;
+                if (reg) downloadText(reg, 'Block_USB_Storage.reg');
+              }}
+              className="px-3 py-2 rounded-xl text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition"
+              title="Télécharger le fichier .reg d'importation dans le Registre Windows"
+            >
+              Fichier .REG
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Instructions Step by Step */}
+        <div className="pt-3 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] text-slate-400">
+          <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center shrink-0">1</span>
+            <span>Téléchargez le script <strong>.bat</strong> ci-dessus</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center shrink-0">2</span>
+            <span>Clic-droit &rsaquo; <strong>Exécuter en tant qu'administrateur</strong></span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center shrink-0">3</span>
+            <span><strong>Effet immédiat :</strong> Clés bloquées, souris/clavier opérationnels !</span>
+          </div>
+        </div>
+      </div>
+
       {/* Primary Action Matrix (Text / Table Layout instead of Card Grid) */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl">
         <div className="flex items-center justify-between mb-4">
@@ -324,17 +418,30 @@ export const MonoposteView: React.FC<MonoposteViewProps> = ({
                   <span className="text-cyan-300">Deny_All = 1</span> | <span className="text-cyan-300">USBSTOR Start = 4</span> | <span className="text-cyan-300">WriteProtect = 1</span>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <button
-                    onClick={() => handleModeChange('BLOCK_ALL')}
-                    disabled={policyMode === 'BLOCK_ALL'}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                      policyMode === 'BLOCK_ALL'
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 cursor-default'
-                        : 'bg-rose-600 hover:bg-rose-500 text-white shadow-sm'
-                    }`}
-                  >
-                    {policyMode === 'BLOCK_ALL' ? 'Actif' : 'Activer'}
-                  </button>
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      onClick={() => {
+                        const bat = SCRIPT_TEMPLATES.find((s) => s.name === 'Bloquer_USB_Immediat.bat')?.content;
+                        if (bat) downloadText(bat, 'Bloquer_USB_Immediat.bat');
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 flex items-center gap-1 transition"
+                      title="Télécharger le script Batch pour bloquer ce PC"
+                    >
+                      <Download className="w-3 h-3" />
+                      .BAT
+                    </button>
+                    <button
+                      onClick={() => handleModeChange('BLOCK_ALL')}
+                      disabled={policyMode === 'BLOCK_ALL'}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        policyMode === 'BLOCK_ALL'
+                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 cursor-default'
+                          : 'bg-rose-600 hover:bg-rose-500 text-white shadow-sm'
+                      }`}
+                    >
+                      {policyMode === 'BLOCK_ALL' ? 'Actif' : 'Activer'}
+                    </button>
+                  </div>
                 </td>
               </tr>
 
@@ -365,17 +472,30 @@ export const MonoposteView: React.FC<MonoposteViewProps> = ({
                   <span className="text-amber-300">Deny_Write = 1</span> | <span className="text-amber-300">WriteProtect = 1</span> | <span className="text-slate-400">Deny_Read = 0</span>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <button
-                    onClick={() => handleModeChange('READ_ONLY')}
-                    disabled={policyMode === 'READ_ONLY'}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                      policyMode === 'READ_ONLY'
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-default'
-                        : 'bg-amber-600 hover:bg-amber-500 text-white shadow-sm'
-                    }`}
-                  >
-                    {policyMode === 'READ_ONLY' ? 'Actif' : 'Activer'}
-                  </button>
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      onClick={() => {
+                        const bat = SCRIPT_TEMPLATES.find((s) => s.name === 'Lecture_Seule_USB.bat')?.content;
+                        if (bat) downloadText(bat, 'Lecture_Seule_USB.bat');
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 flex items-center gap-1 transition"
+                      title="Télécharger le script Batch pour passer en lecture seule"
+                    >
+                      <Download className="w-3 h-3" />
+                      .BAT
+                    </button>
+                    <button
+                      onClick={() => handleModeChange('READ_ONLY')}
+                      disabled={policyMode === 'READ_ONLY'}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        policyMode === 'READ_ONLY'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-default'
+                          : 'bg-amber-600 hover:bg-amber-500 text-white shadow-sm'
+                      }`}
+                    >
+                      {policyMode === 'READ_ONLY' ? 'Actif' : 'Activer'}
+                    </button>
+                  </div>
                 </td>
               </tr>
 
@@ -406,17 +526,30 @@ export const MonoposteView: React.FC<MonoposteViewProps> = ({
                   <span className="text-indigo-300">Deny_Execute = 1</span> | <span className="text-slate-400">USBSTOR Start = 3</span>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <button
-                    onClick={() => handleModeChange('BLOCK_EXECUTE')}
-                    disabled={policyMode === 'BLOCK_EXECUTE'}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                      policyMode === 'BLOCK_EXECUTE'
-                        ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 cursor-default'
-                        : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm'
-                    }`}
-                  >
-                    {policyMode === 'BLOCK_EXECUTE' ? 'Actif' : 'Activer'}
-                  </button>
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      onClick={() => {
+                        const bat = SCRIPT_TEMPLATES.find((s) => s.name === 'Lecture_Seule_USB.bat')?.content;
+                        if (bat) downloadText(bat, 'Lecture_Seule_USB.bat');
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 flex items-center gap-1 transition"
+                      title="Télécharger le script Batch"
+                    >
+                      <Download className="w-3 h-3" />
+                      .BAT
+                    </button>
+                    <button
+                      onClick={() => handleModeChange('BLOCK_EXECUTE')}
+                      disabled={policyMode === 'BLOCK_EXECUTE'}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        policyMode === 'BLOCK_EXECUTE'
+                          ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 cursor-default'
+                          : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm'
+                      }`}
+                    >
+                      {policyMode === 'BLOCK_EXECUTE' ? 'Actif' : 'Activer'}
+                    </button>
+                  </div>
                 </td>
               </tr>
 
@@ -447,17 +580,30 @@ export const MonoposteView: React.FC<MonoposteViewProps> = ({
                   <span className="text-emerald-300">Deny_All = 0</span> | <span className="text-emerald-300">WriteProtect = 0</span> | <span className="text-emerald-300">USBSTOR = 3</span>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <button
-                    onClick={() => handleModeChange('UNBLOCKED')}
-                    disabled={policyMode === 'UNBLOCKED'}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                      policyMode === 'UNBLOCKED'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
-                        : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm'
-                    }`}
-                  >
-                    {policyMode === 'UNBLOCKED' ? 'Actif' : 'Activer'}
-                  </button>
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      onClick={() => {
+                        const bat = SCRIPT_TEMPLATES.find((s) => s.name === 'Debloquer_USB.bat')?.content;
+                        if (bat) downloadText(bat, 'Debloquer_USB.bat');
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 flex items-center gap-1 transition"
+                      title="Télécharger le script Batch pour débloquer"
+                    >
+                      <Download className="w-3 h-3" />
+                      .BAT
+                    </button>
+                    <button
+                      onClick={() => handleModeChange('UNBLOCKED')}
+                      disabled={policyMode === 'UNBLOCKED'}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        policyMode === 'UNBLOCKED'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
+                          : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm'
+                      }`}
+                    >
+                      {policyMode === 'UNBLOCKED' ? 'Actif' : 'Activer'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>

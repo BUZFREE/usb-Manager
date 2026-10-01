@@ -15,6 +15,7 @@ import { GpoScriptGeneratorView } from './components/GpoScriptGeneratorView';
 import { WhitelistView } from './components/WhitelistView';
 import { UsbAuditView } from './components/UsbAuditView';
 import { ReportsPrintCenterView } from './components/ReportsPrintCenterView';
+import { WifiMikrotikView } from './components/WifiMikrotikView';
 import { PolicyMode, NetworkComputer, DeploymentLog } from './types/usbPolicy';
 import { Shield, CheckCircle2 } from 'lucide-react';
 
@@ -184,6 +185,7 @@ export default function App() {
             <DashboardView
               policyMode={policyMode}
               onApplyPolicy={handleApplyPolicy}
+              setCurrentTab={setCurrentTab}
             />
           )}
 
@@ -204,6 +206,8 @@ export default function App() {
               setDeploymentLogs={setDeploymentLogs}
             />
           )}
+
+          {currentTab === 'wifi-mikrotik' && <WifiMikrotikView />}
 
           {currentTab === 'python' && <PythonEngineView />}
 

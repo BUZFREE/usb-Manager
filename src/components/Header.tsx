@@ -73,6 +73,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'GPO & Scripts PowerShell / .REG';
       case 'reports':
         return "Centre d'Impression & Rapports Officiels";
+      case 'wifi-mikrotik':
+        return "Détection & Blocage Wi-Fi (Exception Winbox MikroTik Port 8291)";
       default:
         return 'WinLock USB Manager';
     }

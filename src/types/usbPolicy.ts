@@ -77,3 +77,52 @@ export interface RegistryKeyPreview {
   valueData: string | number;
   description: string;
 }
+
+export type WifiBlockMode = 
+  | 'BLOCK_ALL_EXCEPT_WINBOX' // Bloquer Wi-Fi sauf Winbox MikroTik (Port TCP 8291, UDP 5678 MNDP, winbox.exe)
+  | 'SSID_ALLOWLIST_ONLY'     // Autoriser uniquement les SSID MikroTik approuvés
+  | 'BLOCK_WIFI_TOTAL'        // Désactivation totale de la carte Wi-Fi
+  | 'MONITOR_ONLY'            // Surveillance et détection sans blocage
+  | 'UNRESTRICTED';           // Wi-Fi totalement libre
+
+export interface WifiNetworkInfo {
+  id: string;
+  ssid: string;
+  bssid: string;
+  signalPercentage: number;
+  channel: number;
+  band: '2.4 GHz' | '5 GHz' | '6 GHz';
+  authType: string;
+  encryption: string;
+  status: 'CONNECTED' | 'IN_RANGE' | 'BLOCKED' | 'SUSPICIOUS_HOTSPOT';
+  isMikrotikDevice?: boolean;
+  routerModel?: string;
+  ipAddress?: string;
+  gateway?: string;
+  notes?: string;
+}
+
+export interface MikrotikWinboxRule {
+  id: string;
+  name: string;
+  protocol: 'TCP' | 'UDP' | 'APP' | 'IP_RANGE';
+  portOrTarget: string;
+  direction: 'Inbound' | 'Outbound' | 'Both';
+  action: 'Allow' | 'Block';
+  description: string;
+  enabled: boolean;
+  isCriticalForWinbox: boolean;
+}
+
+export interface WifiAdapterInfo {
+  name: string;
+  description: string;
+  macAddress: string;
+  guid?: string;
+  status: 'Up' | 'Down' | 'Disabled';
+  connectedSsid?: string;
+  ipv4Address?: string;
+  gateway?: string;
+  isRadioOn: boolean;
+}
+

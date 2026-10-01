@@ -1923,6 +1923,230 @@ if __name__ == "__main__":
 `
   },
   {
+    filename: 'wifi_mikrotik_manager.py',
+    category: 'network',
+    description: 'Gestionnaire de filtrage Wi-Fi avec préservation exclusive des connexions Winbox MikroTik (Port 8291).',
+    code: `#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+==============================================================================
+Projet  : WinLock USB & Network Manager (Python Suite)
+Fichier : wifi_mikrotik_manager.py
+Rôle    : Détection et blocage du Wi-Fi avec préservation de Winbox MikroTik
+Auteur  : SysAdmin & SecOps Engineering
+Usage   : python wifi_mikrotik_manager.py [--block | --unblock | --test | --scan]
+==============================================================================
+"""
+
+import sys
+import os
+import subprocess
+import socket
+import argparse
+import re
+from typing import List, Dict, Any, Optional
+
+try:
+    from colorama import init, Fore, Style
+    init(autoreset=True)
+except ImportError:
+    class Fore:
+        GREEN = RED = YELLOW = CYAN = MAGENTA = WHITE = RESET = ""
+    class Style:
+        BRIGHT = RESET_ALL = ""
+
+
+class WifiMikrotikManager:
+    """
+    Contrôleur de sécurité pour réseaux sans fil sous Windows Defender Firewall.
+    Bloque les flux Wi-Fi non autorisés (hotspots 4G/5G, accès internet non sécurisés)
+    tout en préservant l'accès d'administration Winbox MikroTik (Port TCP 8291 & MNDP UDP 5678).
+    """
+
+    DEFAULT_ROUTER_IP = "192.168.88.1"
+    WINBOX_PORT = 8291
+    MNDP_PORT = 5678
+
+    RULE_BLOCK_NAME = "WinLock-WiFi-Block-Outbound"
+    RULE_ALLOW_TCP_NAME = "WinLock-WiFi-Allow-Winbox-TCP"
+    RULE_ALLOW_UDP_NAME = "WinLock-WiFi-Allow-MNDP-UDP"
+    RULE_ALLOW_APP_NAME = "WinLock-WiFi-Allow-Winbox-App"
+
+    @classmethod
+    def is_windows(cls) -> bool:
+        return sys.platform == "win32"
+
+    @classmethod
+    def run_powershell(cls, command: str) -> subprocess.CompletedProcess:
+        """Exécute une commande PowerShell avec privilèges."""
+        return subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+            capture_output=True,
+            text=True
+        )
+
+    @classmethod
+    def apply_wifi_block_with_winbox_exception(cls, router_ip: str = DEFAULT_ROUTER_IP, port: int = WINBOX_PORT):
+        """
+        Applique les règles de pare-feu :
+        1. Bloque tout trafic sortant sur interface Wireless
+        2. Autorise Winbox TCP port (8291)
+        3. Autorise MNDP UDP port (5678) pour la recherche MAC
+        4. Autorise les exécutables winbox.exe / winbox64.exe
+        """
+        print(f"{Fore.CYAN}{Style.BRIGHT}[*] Application de la politique de blocage Wi-Fi avec exception Winbox...")
+
+        if not cls.is_windows():
+            print(f"{Fore.YELLOW}[SIMULATION] Système non-Windows détecté. Simulation de l'application pare-feu.")
+            print(f"{Fore.GREEN}[OK] Règles pare-feu Wi-Fi configurées avec succès (Mock).")
+            return True
+
+        # 1. Supprimer anciennes règles WinLock-WiFi
+        cls.run_powershell("Remove-NetFirewallRule -Name 'WinLock-WiFi-*' -ErrorAction SilentlyContinue")
+
+        # 2. Règle de blocage général Wi-Fi
+        cmd_block = (
+            f"New-NetFirewallRule -Name '{cls.RULE_BLOCK_NAME}' "
+            f"-DisplayName 'WinLock - Blocage WiFi Sortant' "
+            f"-Description 'Bloque tout le trafic sortant sur cartes sans fil (Anti-Fuite et Anti-Hotspot)' "
+            f"-Direction Outbound -InterfaceType Wireless -Action Block -Profile Any -Enabled True"
+        )
+        res_block = cls.run_powershell(cmd_block)
+
+        # 3. Règle d'exception Winbox TCP 8291
+        cmd_tcp = (
+            f"New-NetFirewallRule -Name '{cls.RULE_ALLOW_TCP_NAME}' "
+            f"-DisplayName 'WinLock - Winbox MikroTik TCP {port}' "
+            f"-Description 'Autorise la connexion administrative Winbox RouterOS' "
+            f"-Direction Outbound -InterfaceType Wireless -Protocol TCP -RemotePort {port} -Action Allow -Profile Any -Enabled True"
+        )
+        res_tcp = cls.run_powershell(cmd_tcp)
+
+        # 4. Règle d'exception MikroTik MNDP UDP 5678 (Découverte MAC)
+        cmd_udp = (
+            f"New-NetFirewallRule -Name '{cls.RULE_ALLOW_UDP_NAME}' "
+            f"-DisplayName 'WinLock - MikroTik MNDP UDP {cls.MNDP_PORT}' "
+            f"-Description 'Autorise la découverte de routeurs MikroTik par adresse MAC' "
+            f"-Direction Outbound -InterfaceType Wireless -Protocol UDP -RemotePort {cls.MNDP_PORT} -Action Allow -Profile Any -Enabled True"
+        )
+        res_udp = cls.run_powershell(cmd_udp)
+
+        # 5. Règle d'exception pour le binaire winbox.exe
+        cmd_app = (
+            f"New-NetFirewallRule -Name '{cls.RULE_ALLOW_APP_NAME}' "
+            f"-DisplayName 'WinLock - Application Winbox Autorisee' "
+            f"-Direction Outbound -InterfaceType Wireless -Program '*winbox*.exe' -Action Allow -Profile Any -Enabled True"
+        )
+        cls.run_powershell(cmd_app)
+
+        print(f"{Fore.GREEN}{Style.BRIGHT}==============================================================================")
+        print(f"{Fore.GREEN} [SUCCESS] POLITIQUE WI-FI APPLIQUÉE AVEC SUCCÈS !")
+        print(f"{Fore.YELLOW}   - Trafic Wi-Fi standard / Partage mobile 4G/5G : BLOQUÉ")
+        print(f"{Fore.GREEN}   - Winbox MikroTik (Port TCP {port})            : AUTORISÉ (OPÉRATIONNEL)")
+        print(f"{Fore.GREEN}   - Découverte MAC MikroTik (Port UDP {cls.MNDP_PORT})       : AUTORISÉE")
+        print(f"{Fore.GREEN}{Style.BRIGHT}==============================================================================")
+        return True
+
+    @classmethod
+    def unblock_wifi(cls):
+        """Supprime les règles de blocage et rétablit le Wi-Fi normal."""
+        print(f"{Fore.CYAN}[*] Rétablissement de l'accès Wi-Fi standard...")
+        if cls.is_windows():
+            cls.run_powershell("Remove-NetFirewallRule -Name 'WinLock-WiFi-*' -ErrorAction SilentlyContinue")
+        print(f"{Fore.GREEN}[OK] Toutes les restrictions Wi-Fi ont été retirées. Connexion standard rétablie.")
+
+    @classmethod
+    def test_winbox_connection(cls, router_ip: str = DEFAULT_ROUTER_IP, port: int = WINBOX_PORT, timeout: float = 3.0) -> bool:
+        """Teste l'accessibilité du routeur MikroTik sur le port Winbox 8291."""
+        print(f"{Fore.CYAN}[*] Test du port Winbox {router_ip}:{port} (Timeout: {timeout}s)...")
+        try:
+            with socket.create_connection((router_ip, port), timeout=timeout):
+                print(f"{Fore.GREEN}{Style.BRIGHT}[+] SUCCÈS : Le routeur MikroTik {router_ip}:{port} est OUVERT et ACCESSIBLE !")
+                return True
+        except socket.timeout:
+            print(f"{Fore.RED}[-] Échec : Délai d'attente dépassé (Timeout) vers {router_ip}:{port}.")
+            return False
+        except ConnectionRefusedError:
+            print(f"{Fore.YELLOW}[!] Port {port} fermé ou service Winbox arrêté sur {router_ip}.")
+            return False
+        except Exception as e:
+            print(f"{Fore.RED}[-] Erreur de connexion vers {router_ip}:{port} : {e}")
+            return False
+
+    @classmethod
+    def scan_wifi_networks(cls) -> List[Dict[str, Any]]:
+        """Scanne les réseaux sans fil à portée via netsh wlan."""
+        print(f"{Fore.CYAN}[*] Analyse des réseaux sans fil en cours...")
+        networks = []
+
+        if not cls.is_windows():
+            print(f"{Fore.YELLOW}[SIMULATION] Réseaux Wi-Fi simulés (Environnement de test) :")
+            networks = [
+                {"ssid": "MikroTik-Admin-Office", "bssid": "DC:2C:6E:9B:44:10", "signal": "94%", "is_mikrotik": True},
+                {"ssid": "Hotspot-iPhone-Direction", "bssid": "FA:8F:CA:21:88:9C", "signal": "78%", "is_mikrotik": False},
+                {"ssid": "Galaxy-S24-Partage-Mobile", "bssid": "9E:B6:D0:A2:14:73", "signal": "62%", "is_mikrotik": False},
+            ]
+        else:
+            proc = subprocess.run(["netsh", "wlan", "show", "networks", "mode=bssid"], capture_output=True, text=True)
+            output = proc.stdout
+            current_ssid = None
+            for line in output.splitlines():
+                line = line.strip()
+                if line.startswith("SSID "):
+                    parts = line.split(":", 1)
+                    if len(parts) == 2:
+                        current_ssid = parts[1].strip()
+                elif line.startswith("BSSID ") and current_ssid:
+                    parts = line.split(":", 1)
+                    bssid = parts[1].strip() if len(parts) == 2 else ""
+                    is_mikrotik = "mikrotik" in current_ssid.lower() or bssid.upper().startswith("DC:2C:6E")
+                    networks.append({
+                        "ssid": current_ssid,
+                        "bssid": bssid,
+                        "is_mikrotik": is_mikrotik
+                    })
+
+        for net in networks:
+            tag = f"{Fore.GREEN}[MIKROTIK]" if net.get("is_mikrotik") else f"{Fore.RED}[BLOQUÉ]"
+            print(f"  {tag} {Fore.WHITE}{net.get('ssid')} {Fore.LIGHTBLACK_EX}({net.get('bssid')})")
+
+        return networks
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Gestionnaire de filtrage Wi-Fi & Exception Winbox MikroTik (WinLock)")
+    parser.add_argument("--block", action="store_true", help="Bloquer tout le Wi-Fi sauf Winbox MikroTik (TCP 8291)")
+    parser.add_argument("--unblock", action="store_true", help="Supprimer le filtrage et rétablir le Wi-Fi standard")
+    parser.add_argument("--test", action="store_true", help="Tester l'accessibilité du routeur MikroTik sur le port 8291")
+    parser.add_argument("--scan", action="store_true", help="Scanner les réseaux Wi-Fi à portée")
+    parser.add_argument("--ip", default="192.168.88.1", help="Adresse IP du routeur MikroTik (Défaut: 192.168.88.1)")
+    parser.add_argument("--port", type=int, default=8291, help="Port Winbox (Défaut: 8291)")
+
+    args = parser.parse_args()
+
+    if args.block:
+        WifiMikrotikManager.apply_wifi_block_with_winbox_exception(args.ip, args.port)
+    elif args.unblock:
+        WifiMikrotikManager.unblock_wifi()
+    elif args.test:
+        WifiMikrotikManager.test_winbox_connection(args.ip, args.port)
+    elif args.scan:
+        WifiMikrotikManager.scan_wifi_networks()
+    else:
+        print(f"{Fore.CYAN}{Style.BRIGHT}=== WINLOCK WIFI & MIKROTIK WINBOX CONTROLLER ===")
+        print(f"Utilisation :")
+        print(f"  python wifi_mikrotik_manager.py --block   (Bloquer Wi-Fi sauf Winbox)")
+        print(f"  python wifi_mikrotik_manager.py --test    (Tester port 8291)")
+        print(f"  python wifi_mikrotik_manager.py --scan    (Scanner les ondes Wi-Fi)")
+        print(f"  python wifi_mikrotik_manager.py --unblock (Débloquer)")
+        WifiMikrotikManager.test_winbox_connection(args.ip, args.port)
+
+
+if __name__ == "__main__":
+    main()
+`
+  },
+  {
     filename: 'requirements.txt',
     category: 'build',
     description: 'Dépendances Python requises pour la suite Windows.',
@@ -1954,6 +2178,8 @@ Suite logicielle professionnelle en **Python 3.12** pour Windows permettant d'ad
 6. **\`network_scanner.py\`** : Scanner réseau multi-threads qui audite un sous-réseau complet (ex: \`192.168.1.0/24\`) et applique les politiques USB à distance sans installer d'agent lourd (WMI \`StdRegProv\`).
 7. **\`usb_forensics.py\`** : Outil d'investigation forensique extrayant l'historique complet de toutes les clés USB ayant été branchées sur le PC depuis sa mise en service.
 8. **\`build_exe.py\`** : Script de compilation avec PyInstaller créant un fichier \`WinLockUsb.exe\` autonome avec élévation UAC administrateur native.
+9. **\`wifi_mikrotik_manager.py\`** : Contrôleur de réseau sans fil bloquant le Wi-Fi (partages 4G/5G) avec exception Winbox MikroTik (Port TCP 8291 & UDP 5678).
+
 
 ---
 

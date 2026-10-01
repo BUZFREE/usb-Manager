@@ -21,7 +21,9 @@ import {
   CheckCircle2, 
   Layers,
   X,
-  Menu
+  Menu,
+  Wifi,
+  Router
 } from 'lucide-react';
 import { PolicyMode } from '../types/usbPolicy';
 import { useTheme, ThemeMode } from '../context/ThemeContext';
@@ -99,6 +101,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           subLabel: 'Flotte de machines & WMI',
           icon: Globe,
           badge: `${computersCount} PCs`,
+        },
+        {
+          id: 'wifi-mikrotik',
+          label: 'Wi-Fi & Winbox MikroTik',
+          subLabel: 'Blocage Wi-Fi / Exception Port 8291',
+          icon: Wifi,
+          badge: 'Winbox OK',
+          highlight: true,
         },
       ],
     },

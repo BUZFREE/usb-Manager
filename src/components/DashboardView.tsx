@@ -29,7 +29,8 @@ import {
   Check,
   X,
   Download,
-  Terminal
+  Terminal,
+  Router
 } from 'lucide-react';
 import { RealtimeUsbEvent, UsbPortState, SocketConnectionState, PortStatus } from '../types/dashboardTypes';
 import { PolicyMode } from '../types/usbPolicy';
@@ -39,11 +40,13 @@ import { downloadText } from '../utils/zipGenerator';
 interface DashboardViewProps {
   policyMode: PolicyMode;
   onApplyPolicy: (mode: PolicyMode, retroactive: boolean) => void;
+  setCurrentTab?: (tab: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   policyMode,
   onApplyPolicy,
+  setCurrentTab,
 }) => {
   // Socket connection state (connects to local agent ws://127.0.0.1:8765 if running on Windows)
   const [socketState, setSocketState] = useState<SocketConnectionState>({
@@ -588,6 +591,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="text-emerald-400 font-bold">Souris & Clavier Actifs</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Wi-Fi Detection & Winbox MikroTik Protection Banner */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shrink-0 mt-0.5">
+            <Wifi className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                Filtrage Wi-Fi & Exception Winbox MikroTik
+              </h3>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                Port TCP 8291 Préservé
+              </span>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                UDP 5678 (MNDP)
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
+              Détectez les interfaces sans fil et bloquez les connexions Wi-Fi / partages de données 4G/5G non autorisés, 
+              tout en maintenant l'accès exclusif aux routeurs <strong>MikroTik RouterOS via Winbox</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {setCurrentTab && (
+            <button
+              onClick={() => setCurrentTab('wifi-mikrotik')}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition flex items-center gap-1.5 shadow-md active:scale-95"
+            >
+              <Router className="w-4 h-4 text-emerald-400" />
+              <span>Gérer Wi-Fi & Winbox</span>
+            </button>
+          )}
         </div>
       </div>
 

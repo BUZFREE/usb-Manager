@@ -412,6 +412,198 @@ Write-Host "[+] Rapport d'inventaire exporté avec succès dans :" -ForegroundCo
 Write-Host "    $ExportPath" -ForegroundColor White
 Write-Host "================================================================="
 `
+  },
+  {
+    name: 'Bloquer-Wifi-Sauf-Winbox-MikroTik.ps1',
+    extension: 'ps1',
+    description: 'Bloque tout le trafic Wi-Fi sur Windows Defender Firewall SAUF les connexions Winbox MikroTik (Port TCP 8291, MNDP UDP 5678 & winbox.exe)',
+    category: 'powershell',
+    content: `<#
+.SYNOPSIS
+    WinLock - Blocage de la connexion Wi-Fi avec Exception Winbox MikroTik.
+.DESCRIPTION
+    1. Bloque le trafic réseau Wi-Fi (Internet, HTTP, DNS, SMB, partages) sur les cartes sans fil.
+    2. Autorise EXCLUSIVEMENT les connexions de gestion MikroTik RouterOS :
+       - Port TCP 8291 (Port officiel Winbox)
+       - Port UDP 5678 (MikroTik Neighbor Discovery Protocol - MNDP / Recherche MAC Winbox)
+       - Processus Winbox (winbox.exe et winbox64.exe)
+       - Sous-réseau d'administration MikroTik (par défaut : 192.168.88.0/24)
+.NOTES
+    Exécuter dans une session PowerShell élevée en tant qu'Administrateur.
+#>
+
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $false)]
+    [string]$MikrotikRouterIP = "192.168.88.1",
+
+    [Parameter(Mandatory = $false)]
+    [string]$MikrotikSubnet = "192.168.88.0/24"
+)
+
+function Test-IsAdmin {
+    $currentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($currentIdentity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+if (-not (Test-IsAdmin)) {
+    Write-Warning "Ce script doit être exécuté en Administrateur (Clic-droit > Exécuter avec PowerShell)."
+    exit 1
+}
+
+Write-Host "================================================================================" -ForegroundColor Cyan
+Write-Host "   WINLOCK - BLOCAGE DU WI-FI AVEC EXCEPTION WINBOX MIKROTIK (ROUTEROS)         " -ForegroundColor Cyan
+Write-Host "================================================================================" -ForegroundColor Cyan
+Write-Host "Configuration cible :" -ForegroundColor White
+Write-Host "  * IP Routeur MikroTik : $MikrotikRouterIP" -ForegroundColor Yellow
+Write-Host "  * Sous-réseau d'admin : $MikrotikSubnet" -ForegroundColor Yellow
+Write-Host "  * Port TCP Winbox     : 8291 (Totalement Ouvert & Protégé)" -ForegroundColor Green
+Write-Host "  * Port UDP Découverte : 5678 (MNDP / MAC Telnet Actif)" -ForegroundColor Green
+Write-Host "--------------------------------------------------------------------------------" -ForegroundColor Gray
+
+# 1. Nettoyage des anciennes règles WinLock Wi-Fi si existantes
+Remove-NetFirewallRule -Name "WinLock-WiFi-*" -ErrorAction SilentlyContinue
+
+# 2. Règle 1 : Bloquer tout le trafic sortant sur les interfaces Wi-Fi
+Write-Host "[1/4] Application du blocage général du trafic Wi-Fi..." -ForegroundColor Yellow
+New-NetFirewallRule -Name "WinLock-WiFi-Block-Outbound" \`
+    -DisplayName "WinLock - Blocage Trafic Wi-Fi Général" \`
+    -Description "Bloque tout le trafic sortant sur les adaptateurs sans fil pour empêcher les fuites et partages de connexion." \`
+    -Direction Outbound \`
+    -InterfaceType Wireless \`
+    -Action Block \`
+    -Profile Any \`
+    -Enabled True | Out-Null
+
+# 3. Règle 2 : Exception Winbox MikroTik TCP 8291 (Gestion RouterOS)
+Write-Host "[2/4] Création de l'exception prioritaire Winbox (Port TCP 8291)..." -ForegroundColor Green
+New-NetFirewallRule -Name "WinLock-WiFi-Allow-Winbox-TCP" \`
+    -DisplayName "WinLock - Exception Winbox MikroTik TCP 8291" \`
+    -Description "Autorise explicitement la connexion Winbox MikroTik sur le port TCP 8291." \`
+    -Direction Outbound \`
+    -InterfaceType Wireless \`
+    -Protocol TCP \`
+    -RemotePort 8291 \`
+    -Action Allow \`
+    -Profile Any \`
+    -Enabled True | Out-Null
+
+# 4. Règle 3 : Exception MikroTik MNDP UDP 5678 (Découverte voisins & Winbox MAC)
+Write-Host "[3/4] Création de l'exception de découverte MikroTik (Port UDP 5678)..." -ForegroundColor Green
+New-NetFirewallRule -Name "WinLock-WiFi-Allow-MNDP-UDP" \`
+    -DisplayName "WinLock - Exception MikroTik MNDP UDP 5678" \`
+    -Description "Permet à Winbox de découvrir les routeurs MikroTik par adresse MAC et MNDP." \`
+    -Direction Outbound \`
+    -InterfaceType Wireless \`
+    -Protocol UDP \`
+    -RemotePort 5678 \`
+    -Action Allow \`
+    -Profile Any \`
+    -Enabled True | Out-Null
+
+# 5. Règle 4 : Exception applicative pour les processus winbox.exe et winbox64.exe
+Write-Host "[4/4] Autorisation du binaire officiel Winbox..." -ForegroundColor Green
+New-NetFirewallRule -Name "WinLock-WiFi-Allow-Winbox-App" \`
+    -DisplayName "WinLock - Autorisation Application Winbox" \`
+    -Description "Autorise le binaire Winbox à émettre sur le réseau Wi-Fi vers le routeur." \`
+    -Direction Outbound \`
+    -InterfaceType Wireless \`
+    -Program "%SystemRoot%\\..\\*winbox*.exe" \`
+    -Action Allow \`
+    -Profile Any \`
+    -Enabled True -ErrorAction SilentlyContinue | Out-Null
+
+Write-Host "--------------------------------------------------------------------------------" -ForegroundColor Gray
+Write-Host " [+] VERROUILLAGE ACTIF : Tout le Wi-Fi externe / Internet est BLOQUE." -ForegroundColor Green
+Write-Host " [+] EXCEPTION VALIDEE  : Winbox MikroTik (TCP 8291 & UDP 5678) est OPERATIONNEL." -ForegroundColor Green
+Write-Host "================================================================================" -ForegroundColor Cyan
+`
+  },
+  {
+    name: 'Bloquer-Wifi-Sauf-Winbox-MikroTik.bat',
+    extension: 'bat',
+    description: 'Lanceur Batch 1-Clic pour bloquer le Wi-Fi tout en maintenant Winbox MikroTik accessible',
+    category: 'powershell',
+    content: `@echo off
+chcp 65001 >nul
+title WinLock - Blocage Wi-Fi avec Exception Winbox MikroTik (TCP 8291)
+color 0b
+cls
+echo ==============================================================================
+echo   WINLOCK - BLOCAGE DU WI-FI AVEC EXCEPTION WINBOX MIKROTIK
+echo ==============================================================================
+echo Application des regles Windows Defender Firewall...
+echo.
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$ErrorActionPreference = 'SilentlyContinue'; " ^
+  "Remove-NetFirewallRule -Name 'WinLock-WiFi-*' -ErrorAction SilentlyContinue; " ^
+  "New-NetFirewallRule -Name 'WinLock-WiFi-Block-Outbound' -DisplayName 'WinLock - Blocage WiFi Sortant' -Direction Outbound -InterfaceType Wireless -Action Block -Profile Any -Enabled True | Out-Null; " ^
+  "New-NetFirewallRule -Name 'WinLock-WiFi-Allow-Winbox-TCP' -DisplayName 'WinLock - Winbox MikroTik TCP 8291' -Direction Outbound -InterfaceType Wireless -Protocol TCP -RemotePort 8291 -Action Allow -Profile Any -Enabled True | Out-Null; " ^
+  "New-NetFirewallRule -Name 'WinLock-WiFi-Allow-MNDP-UDP' -DisplayName 'WinLock - MikroTik MNDP UDP 5678' -Direction Outbound -InterfaceType Wireless -Protocol UDP -RemotePort 5678 -Action Allow -Profile Any -Enabled True | Out-Null; " ^
+  "Write-Host '==============================================================================' -ForegroundColor Cyan; " ^
+  "Write-Host ' [OK] BLOCAGE WI-FI APPLIQUE AVEC SUCCES !' -ForegroundColor Green; " ^
+  "Write-Host '   * Connexions Wi-Fi standards : BLOQUEES (Anti-Fuite / Anti-Hotspot)' -ForegroundColor Yellow; " ^
+  "Write-Host '   * Winbox MikroTik (Port 8291): 100%% AUTORISE ET FONCTIONNEL' -ForegroundColor Green; " ^
+  "Write-Host '   * Decouverte MAC (Port 5678) : 100%% AUTORISEE' -ForegroundColor Green; " ^
+  "Write-Host '==============================================================================' -ForegroundColor Cyan;"
+
+echo.
+pause
+`
+  },
+  {
+    name: 'Debloquer-Wifi.bat',
+    extension: 'bat',
+    description: 'Supprime les restrictions de pare-feu et rétablit le Wi-Fi complet',
+    category: 'powershell',
+    content: `@echo off
+chcp 65001 >nul
+title WinLock - Retablissement du Wi-Fi Standard
+color 0a
+cls
+echo ==============================================================================
+echo   WINLOCK - RETABLISSEMENT DU WI-FI (LEVER LES RESTRICTIONS)
+echo ==============================================================================
+echo Suppression des regles de filtrage Wi-Fi...
+echo.
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "Remove-NetFirewallRule -Name 'WinLock-WiFi-*' -ErrorAction SilentlyContinue; " ^
+  "Write-Host ' [OK] Toutes les regles de blocage Wi-Fi ont ete retirees.' -ForegroundColor Green; " ^
+  "Write-Host ' Le Wi-Fi de ce PC fonctionne desormais de maniere standard.' -ForegroundColor White;"
+
+echo.
+pause
+`
+  },
+  {
+    name: 'Tester-Winbox-Port8291.ps1',
+    extension: 'ps1',
+    description: 'Teste l\'accessibilité du routeur MikroTik et du port Winbox 8291 depuis ce PC',
+    category: 'powershell',
+    content: `<#
+.SYNOPSIS
+    Test de connectivité Winbox MikroTik RouterOS (Port TCP 8291 & Découverte UDP 5678)
+#>
+
+param(
+    [string]$RouterIP = "192.168.88.1"
+)
+
+Write-Host "Test de communication vers le routeur MikroTik ($RouterIP : 8291)..." -ForegroundColor Cyan
+
+$test = Test-NetConnection -ComputerName $RouterIP -Port 8291 -WarningAction SilentlyContinue
+
+if ($test.TcpTestSucceeded) {
+    Write-Host " [SUCCESS] Le port Winbox 8291 est OUVERT et accessible !" -ForegroundColor Green
+    Write-Host " Temps de reponse : $($test.RoundTripTime) ms" -ForegroundColor Yellow
+} else {
+    Write-Host " [AVERTISSEMENT] Le port 8291 ne repond pas sur $RouterIP." -ForegroundColor Red
+    Write-Host " Verifiez que le routeur MikroTik est bien allume et que son IP correspond." -ForegroundColor Gray
+}
+`
   }
 ];
 

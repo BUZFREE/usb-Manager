@@ -1,6 +1,6 @@
 {
   "name": "WinLock USB & GPO Manager (Python Suite)",
-  "description": "Suite logicielle universelle en Python (winreg, ctypes Win32, pywin32, WMI) pour administrer, bloquer ou autoriser les clés USB et disques amovibles sur tous les systèmes Windows (11, 10, 8.1, 7, Vista, XP & Server).",
+  "description": "Suite logicielle universelle pour administrer et bloquer les clés USB, disques amovibles et flux Wi-Fi non autorisés (hotspots 4G/5G) sous Windows, avec exception exclusive pour Winbox MikroTik (Port TCP 8291 & UDP 5678).",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

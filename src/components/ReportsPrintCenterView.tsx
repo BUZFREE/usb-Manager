@@ -28,11 +28,14 @@ import {
   exportComplianceCsv, 
   exportConnectedDevicesJson, 
   exportConnectedDevicesCsv,
+  exportFleetInventoryCsv,
+  exportFleetInventoryJson,
   UsbActivityLog,
   ConnectedUsbDevice
 } from '../utils/pdfExport';
 import { downloadText } from '../utils/zipGenerator';
 import { NetworkComputer, PolicyMode } from '../types/usbPolicy';
+import { useLocalMachine } from '../context/LocalMachineContext';
 
 interface ReportsPrintCenterViewProps {
   policyMode: PolicyMode;
@@ -43,6 +46,8 @@ export const ReportsPrintCenterView: React.FC<ReportsPrintCenterViewProps> = ({
   policyMode,
   computers = []
 }) => {
+  const { localMachine } = useLocalMachine();
+
   // Global Report Metadata
   const [organization, setOrganization] = useState('ENTREPRISE & ASSOCIÉS (DSI / RSSI)');
   const [auditorName, setAuditorName] = useState('Équipe Sécurité Opérationnelle (SecOps)');
@@ -262,8 +267,8 @@ export const ReportsPrintCenterView: React.FC<ReportsPrintCenterViewProps> = ({
 
   const handleExportConnectedJson = () => {
     exportConnectedDevicesJson(connectedDevices, {
-      hostname: 'PC-ADMIN-LOCAL',
-      os: 'Windows 11 Enterprise (23H2 x64)',
+      hostname: localMachine.hostname,
+      os: localMachine.os,
       scanDate: reportDate,
       auditor: auditorName,
     });
@@ -271,8 +276,40 @@ export const ReportsPrintCenterView: React.FC<ReportsPrintCenterViewProps> = ({
 
   const handleExportConnectedCsv = () => {
     exportConnectedDevicesCsv(connectedDevices, {
-      hostname: 'PC-ADMIN-LOCAL',
+      hostname: localMachine.hostname,
       scanDate: reportDate,
+    });
+  };
+
+  const allFleetForExport = [
+    {
+      id: 'local-client-host',
+      hostname: `${localMachine.hostname} [Poste Client Host]`,
+      ip: localMachine.ip,
+      macAddress: localMachine.macAddress,
+      nicAdapter: localMachine.nicAdapter,
+      domain: localMachine.domainOrWorkgroup,
+      os: localMachine.os,
+      currentPolicy: policyMode,
+      status: 'online',
+      lastSync: localMachine.lastDetected,
+    },
+    ...computers,
+  ];
+
+  const handleExportFleetCsv = () => {
+    exportFleetInventoryCsv(allFleetForExport, {
+      organization,
+      dateGenerated: reportDate,
+      auditor: auditorName,
+    });
+  };
+
+  const handleExportFleetJson = () => {
+    exportFleetInventoryJson(allFleetForExport, {
+      organization,
+      dateGenerated: reportDate,
+      auditor: auditorName,
     });
   };
 
@@ -573,6 +610,30 @@ export const ReportsPrintCenterView: React.FC<ReportsPrintCenterViewProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Host Machine Physical Identification Banner */}
+              <div className="bg-slate-50 border border-slate-300 rounded p-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px] font-mono text-slate-800">
+                <div>
+                  <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-sans font-bold">Poste Client Audité (Nom Réel)</span>
+                  <span className="font-bold text-slate-900">{localMachine.hostname}</span>
+                  <span className="block text-[9px] text-slate-500 font-sans">
+                    {localMachine.isVerifiedReal ? '✅ Scan Réel Certifié' : '⚠️ Scan en Attente'}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-sans font-bold">Adresse IP Locale</span>
+                  <span className="font-bold text-emerald-700">{localMachine.ip}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-sans font-bold">Adresse MAC Physique</span>
+                  <span className="font-bold text-indigo-700">{localMachine.macAddress}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-sans font-bold">Carte Réseau (NIC)</span>
+                  <span className="truncate block text-slate-700" title={localMachine.nicAdapter}>{localMachine.nicAdapter}</span>
+                </div>
+              </div>
+
               <table className="w-full text-left text-[11px] border-collapse">
                 <thead>
                   <tr className="bg-slate-900 text-white font-bold">
@@ -705,28 +766,68 @@ export const ReportsPrintCenterView: React.FC<ReportsPrintCenterViewProps> = ({
           {/* TAB 5: NETWORK FLEET TABLE */}
           {activeReportTab === 'NETWORK_FLEET' && (
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide border-b pb-1">
-                5. Bordereau de Parc des Postes de Travail & Contrôleurs
-              </h3>
+              <div className="flex items-center justify-between border-b pb-1">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                  5. Bordereau d'Inventaire Exhaustif du Parc des Postes (Noms Réels, Adresses MAC & IP)
+                </h3>
+                <div className="text-xs text-slate-600 font-mono no-print flex gap-2">
+                  <button onClick={handleExportFleetCsv} className="text-cyan-700 hover:underline">
+                    Export CSV
+                  </button>
+                  <span>•</span>
+                  <button onClick={handleExportFleetJson} className="text-cyan-700 hover:underline">
+                    Export JSON
+                  </button>
+                </div>
+              </div>
+
               <table className="w-full text-left text-[11px] border-collapse">
                 <thead>
                   <tr className="bg-slate-900 text-white font-bold">
-                    <th className="p-2">Machine (NetBIOS)</th>
+                    <th className="p-2">Nom Réel (Hostname)</th>
                     <th className="p-2">Adresse IP</th>
+                    <th className="p-2">Adresse MAC</th>
+                    <th className="p-2">Carte Réseau (NIC)</th>
                     <th className="p-2">Domaine AD</th>
                     <th className="p-2">Système d'Exploitation</th>
-                    <th className="p-2">Politique USB Active</th>
+                    <th className="p-2">Politique USB</th>
                     <th className="p-2">Statut</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
+                  {/* Host Client Row */}
+                  <tr className="bg-cyan-50/80 font-mono text-[10px] font-semibold border-b border-cyan-200">
+                    <td className="p-2 font-bold font-sans text-cyan-950 text-[11px]">
+                      {localMachine.hostname}
+                      <span className="ml-2 inline-block px-1.5 py-0.5 rounded bg-cyan-200 text-cyan-800 text-[9px] font-sans">
+                        [Poste Client Host]
+                      </span>
+                    </td>
+                    <td className="p-2 font-bold text-emerald-800">{localMachine.ip}</td>
+                    <td className="p-2 font-bold text-indigo-800">{localMachine.macAddress}</td>
+                    <td className="p-2 font-sans text-slate-700 truncate max-w-[130px]" title={localMachine.nicAdapter}>
+                      {localMachine.nicAdapter}
+                    </td>
+                    <td className="p-2 font-sans text-slate-700">{localMachine.domainOrWorkgroup}</td>
+                    <td className="p-2 font-sans text-[10px] text-slate-600">{localMachine.os}</td>
+                    <td className="p-2 font-sans font-bold text-cyan-900">
+                      {policyMode === 'BLOCK_ALL' ? 'BLOQUÉ TOTAL' : policyMode === 'READ_ONLY' ? 'LECTURE SEULE' : 'AUTORISÉ'}
+                    </td>
+                    <td className="p-2 font-sans text-emerald-700 font-bold">
+                      {localMachine.isVerifiedReal ? 'CERTIFIÉ RÉEL' : 'EN ATTENTE'}
+                    </td>
+                  </tr>
                   {computers.map((comp) => (
-                    <tr key={comp.id} className="hover:bg-slate-50">
-                      <td className="p-2 font-bold text-slate-900">{comp.hostname}</td>
-                      <td className="p-2 font-mono text-[10px] text-slate-600">{comp.ip}</td>
-                      <td className="p-2 text-slate-700">{comp.domain}</td>
-                      <td className="p-2 text-[10px] text-slate-600">{comp.os}</td>
-                      <td className="p-2 font-bold">
+                    <tr key={comp.id} className="hover:bg-slate-50 font-mono text-[10px]">
+                      <td className="p-2 font-bold font-sans text-slate-900 text-[11px]">{comp.hostname}</td>
+                      <td className="p-2 font-bold text-emerald-800">{comp.ip}</td>
+                      <td className="p-2 font-bold text-indigo-800">{comp.macAddress}</td>
+                      <td className="p-2 font-sans text-slate-600 truncate max-w-[130px]" title={comp.nicAdapter}>
+                        {comp.nicAdapter || 'Ethernet/Wi-Fi standard'}
+                      </td>
+                      <td className="p-2 font-sans text-slate-700">{comp.domain}</td>
+                      <td className="p-2 font-sans text-[10px] text-slate-600">{comp.os}</td>
+                      <td className="p-2 font-sans font-bold">
                         {comp.currentPolicy === 'BLOCK_ALL' ? (
                           <span className="text-rose-700">BLOQUÉ TOTAL</span>
                         ) : comp.currentPolicy === 'READ_ONLY' ? (
@@ -735,7 +836,7 @@ export const ReportsPrintCenterView: React.FC<ReportsPrintCenterViewProps> = ({
                           <span className="text-emerald-700">AUTORISÉ</span>
                         )}
                       </td>
-                      <td className="p-2 text-emerald-700 font-bold">{comp.status.toUpperCase()}</td>
+                      <td className="p-2 font-sans text-emerald-700 font-bold">{comp.status.toUpperCase()}</td>
                     </tr>
                   ))}
                 </tbody>

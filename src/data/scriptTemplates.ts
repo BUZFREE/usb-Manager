@@ -335,6 +335,83 @@ gpupdate /target:computer /wait:0 >nul 2>&1
 echo [SUCCES] Tous les ports USB sont DEBLOQUES. Acces normal retabli.
 pause
 `
+  },
+  {
+    name: 'Audit-Inventaire-PC-Local-Et-Reseau.ps1',
+    extension: 'ps1',
+    description: 'Script PowerShell d\'inventaire complet : extrait le nom réel du PC, l\'adresse MAC, l\'IP locale et le statut USB',
+    category: 'powershell',
+    content: `<#
+.SYNOPSIS
+    WinLock USB - Inventaire Matériel & Réseau Haute Précision (Nom Réel, MAC & IP)
+    Extrait les coordonnées réelles de l'ordinateur Windows et génère un rapport certifié.
+#>
+
+[CmdletBinding()]
+param(
+    [string]$ExportPath = "$([Environment]::GetFolderPath('Desktop'))\\Inventaire_PC_$($env:COMPUTERNAME).json"
+)
+
+Write-Host "=================================================================" -ForegroundColor Cyan
+Write-Host " INVENTAIRE MATÉRIEL ET RÉSEAU DU POSTE WINDOWS (Nom, MAC, IP)  " -ForegroundColor Cyan
+Write-Host "================================================================="
+
+# 1. Nom Réel de l'ordinateur et Domaine
+$computerName = $env:COMPUTERNAME
+$computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction SilentlyContinue
+$domainName = if ($computerSystem) { $computerSystem.Domain } else { "WORKGROUP" }
+$osInfo = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction SilentlyContinue
+
+# 2. Cartes Réseau et Adresses MAC Physiques
+$adapters = Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq "Up" }
+$primaryAdapter = $adapters | Select-Object -First 1
+
+# 3. Adresses IP Réseau
+$ipAddresses = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" }
+$primaryIp = if ($ipAddresses) { $ipAddresses[0].IPAddress } else { "127.0.0.1" }
+
+# 4. Statut du verrouillage USB dans le Registre
+$policyPath = "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices"
+$usbstorPath = "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USBSTOR"
+
+$denyAll = (Get-ItemProperty -Path $policyPath -Name "Deny_All" -ErrorAction SilentlyContinue).Deny_All
+$usbstorStart = (Get-ItemProperty -Path $usbstorPath -Name "Start" -ErrorAction SilentlyContinue).Start
+
+$usbStatus = if ($denyAll -eq 1 -or $usbstorStart -eq 4) { "BLOQUÉ TOTAL" }
+             elseif ((Get-ItemProperty -Path "$policyPath\\{53f5630d-b6bf-11d0-94f2-00a0c91efb8b}" -Name "Deny_Write" -ErrorAction SilentlyContinue).Deny_Write -eq 1) { "LECTURE SEULE" }
+             else { "AUTORISÉ (DÉBLOQUÉ)" }
+
+# Affichage à l'écran
+Write-Host "  • Nom Réel (NetBIOS) : " -NoNewline; Write-Host $computerName -ForegroundColor Yellow
+Write-Host "  • Domaine / Réseau   : " -NoNewline; Write-Host $domainName -ForegroundColor Green
+Write-Host "  • Adresse IP Locale  : " -NoNewline; Write-Host $primaryIp -ForegroundColor Green
+Write-Host "  • Adresse MAC        : " -NoNewline; Write-Host $primaryAdapter.MacAddress -ForegroundColor Cyan
+Write-Host "  • Contrôleur NIC     : " -NoNewline; Write-Host $primaryAdapter.InterfaceDescription -ForegroundColor Gray
+Write-Host "  • Système d'Exploit. : " -NoNewline; Write-Host "$($osInfo.Caption) ($($osInfo.OSArchitecture))" -ForegroundColor Gray
+Write-Host "  • Politique USB      : " -NoNewline; Write-Host $usbStatus -ForegroundColor $(if ($usbStatus -like "*BLOQUÉ*") { "Red" } else { "Green" })
+Write-Host "-----------------------------------------------------------------"
+
+# Export Structuré JSON
+$inventoryData = [PSCustomObject]@{
+    Timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    NomReelHostname = $computerName
+    Domaine = $domainName
+    AdresseIp = $primaryIp
+    AdresseMac = $primaryAdapter.MacAddress
+    CarteReseau = $primaryAdapter.InterfaceDescription
+    VitesseLiaison = $primaryAdapter.LinkSpeed
+    SystemeExploitation = $osInfo.Caption
+    Architecture = $osInfo.OSArchitecture
+    StatutUsb = $usbStatus
+    DenyAllGpo = $denyAll
+    UsbStorStart = $usbstorStart
+}
+
+$inventoryData | ConvertTo-Json -Depth 3 | Out-File -FilePath $ExportPath -Encoding utf8
+Write-Host "[+] Rapport d'inventaire exporté avec succès dans :" -ForegroundColor Green
+Write-Host "    $ExportPath" -ForegroundColor White
+Write-Host "================================================================="
+`
   }
 ];
 

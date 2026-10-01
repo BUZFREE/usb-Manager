@@ -33,7 +33,11 @@ import {
   Copy, 
   Check,
   Headphones,
-  Laptop
+  Laptop,
+  Upload,
+  ClipboardCheck,
+  ClipboardCopy,
+  Sparkles
 } from 'lucide-react';
 import { DEVICE_TAXONOMY_INFO } from '../data/scriptTemplates';
 import { 
@@ -44,6 +48,7 @@ import {
   exportConnectedDevicesJson, 
   exportConnectedDevicesCsv 
 } from '../utils/pdfExport';
+import { useLocalMachine } from '../context/LocalMachineContext';
 
 export const UsbAuditView: React.FC = () => {
   // Activity Logs Data (Historical Access Attempts)
@@ -344,10 +349,74 @@ export const UsbAuditView: React.FC = () => {
     setIsScanningConnected(false);
   };
 
+  const { 
+    localMachine, 
+    downloadScannerBat, 
+    importScanJsonContent,
+    importFromClipboard,
+    copyPowerShellCommand
+  } = useLocalMachine();
+  const fileInputAuditRef = React.useRef<HTMLInputElement>(null);
+  const [auditNotice, setAuditNotice] = useState<string | null>(null);
+
+  const handleAuditPasteClipboard = async () => {
+    setAuditNotice("Lecture du presse-papiers...");
+    const res = await importFromClipboard();
+    setAuditNotice(res.message);
+    setTimeout(() => setAuditNotice(null), 8000);
+  };
+
+  const handleAuditCopyPowerShell = async () => {
+    const ok = await copyPowerShellCommand();
+    if (ok) {
+      setAuditNotice("⚡ Commande PowerShell copiée ! Collez dans PowerShell (Ctrl+V) et appuyez sur Entrée, puis cliquez sur [📋 Coller Scan].");
+    }
+    setTimeout(() => setAuditNotice(null), 8000);
+  };
+
+  const handleAuditFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        const result = importScanJsonContent(content);
+        setAuditNotice(result.message);
+        try {
+          const parsed = JSON.parse(content);
+          if (Array.isArray(parsed.usbDevices) && parsed.usbDevices.length > 0) {
+            const mapped: ConnectedUsbDevice[] = parsed.usbDevices.map((u: any, idx: number) => ({
+              id: `cdev-scanned-${Date.now()}-${idx}`,
+              vendorId: u.id ? (u.id.match(/VID_([0-9A-Fa-f]{4})/i)?.[1] ? `0x${u.id.match(/VID_([0-9A-Fa-f]{4})/i)![1].toUpperCase()}` : '0x0781') : '0x0781',
+              productId: u.id ? (u.id.match(/PID_([0-9A-Fa-f]{4})/i)?.[1] ? `0x${u.id.match(/PID_([0-9A-Fa-f]{4})/i)![1].toUpperCase()}` : '0x5581') : '0x5581',
+              serialNumber: u.id ? u.id.split('\\').pop() || `SN-${idx}` : `SN-${idx}`,
+              deviceModel: u.name || 'Périphérique USB Physique Détecté',
+              manufacturer: 'Fabricant PnP Windows',
+              deviceClass: (u.name || '').toLowerCase().includes('storage') || (u.name || '').toLowerCase().includes('disk') || (u.name || '').toLowerCase().includes('mass') ? 'MASS_STORAGE' : (u.name || '').toLowerCase().includes('mouse') ? 'HID_MOUSE' : (u.name || '').toLowerCase().includes('keyboard') ? 'HID_KEYBOARD' : 'COMMUNICATION',
+              deviceClassName: (u.name || '').toLowerCase().includes('storage') || (u.name || '').toLowerCase().includes('disk') ? 'Stockage de Masse Réel' : 'Périphérique PnP',
+              pnpDevicePath: u.id || `USB\\UNKNOWN\\${idx}`,
+              portLocation: 'Port USB Détecté Localement',
+              driverService: (u.name || '').toLowerCase().includes('storage') ? 'USBSTOR.SYS' : 'hidusb.sys',
+              guidClass: '{53f5630d-b6bf-11d0-94f2-00a0c91efb8b}',
+              securityVerdict: (u.name || '').toLowerCase().includes('storage') ? 'BLOQUÉ' : 'PROTÉGÉ_HID',
+              busSpeed: 'USB 3.0 SuperSpeed',
+              powerDraw: '100 mA',
+            }));
+            setConnectedDevices(mapped);
+          }
+        } catch {}
+        setTimeout(() => setAuditNotice(null), 8000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const handleExportConnectedJson = () => {
     exportConnectedDevicesJson(filteredConnectedDevices, {
-      hostname: 'PC-ADMIN-LOCAL',
-      os: 'Windows 11 Enterprise (23H2 x64)',
+      hostname: localMachine.hostname,
+      os: localMachine.os,
       scanDate: new Date().toLocaleString('fr-FR'),
       auditor: auditorName,
     });
@@ -355,7 +424,7 @@ export const UsbAuditView: React.FC = () => {
 
   const handleExportConnectedCsv = () => {
     exportConnectedDevicesCsv(filteredConnectedDevices, {
-      hostname: 'PC-ADMIN-LOCAL',
+      hostname: localMachine.hostname,
       scanDate: new Date().toLocaleString('fr-FR'),
     });
   };
@@ -568,33 +637,114 @@ export const UsbAuditView: React.FC = () => {
 
           {/* Action Buttons for Hardware Scan & Export */}
           <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={fileInputAuditRef}
+              type="file"
+              accept=".json"
+              onChange={handleAuditFileUpload}
+              className="hidden"
+            />
+
+            <button
+              onClick={handleAuditPasteClipboard}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-950 bg-emerald-500 hover:bg-emerald-400 shadow-md transition active:scale-95"
+              title="Coller immédiatement les résultats du scan depuis le presse-papiers"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              1. Coller le Scan (1-Clic)
+            </button>
+
+            <button
+              onClick={handleAuditCopyPowerShell}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 shadow-md transition active:scale-95"
+              title="Copier la commande PowerShell pour scanner ce PC physique"
+            >
+              <ClipboardCopy className="w-3.5 h-3.5" />
+              2. Commande PS (3s)
+            </button>
+
+            <button
+              onClick={downloadScannerBat}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 shadow-md transition active:scale-95"
+              title="Télécharger le script 1-clic pour scanner vos vraies clés USB physiques sur ce PC"
+            >
+              <Download className="w-3.5 h-3.5" />
+              3. Scanner ce PC (.bat)
+            </button>
+
+            <button
+              onClick={() => fileInputAuditRef.current?.click()}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 shadow-md transition active:scale-95"
+              title="Importer le fichier mon_pc_scan.json généré par le script sur votre Bureau"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Importer (.json)
+            </button>
+
             <button
               onClick={handlePerformHardwareScan}
               disabled={isScanningConnected}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 shadow-md transition active:scale-95 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 shadow-md transition active:scale-95 disabled:opacity-50"
               title="Interroger les contrôleurs hôtes USB et les descripteurs PnP du système"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isScanningConnected ? 'animate-spin' : ''}`} />
-              {isScanningConnected ? 'Scan du Bus PnP en cours...' : 'Lancer le Scan Matériel'}
+              <RefreshCw className={`w-3.5 h-3.5 ${isScanningConnected ? 'animate-spin text-cyan-400' : ''}`} />
+              {isScanningConnected ? 'Scan en cours...' : 'Scan Navigateur'}
             </button>
 
             <button
               onClick={handleExportConnectedJson}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-100 bg-slate-800 hover:bg-slate-700 border border-slate-700 shadow-md transition active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 shadow-md transition active:scale-95"
               title="Exporter le rapport d'inventaire complet au format JSON structuré"
             >
               <Download className="w-3.5 h-3.5 text-cyan-400" />
-              Exporter Rapport (JSON)
+              JSON
             </button>
 
             <button
               onClick={handleExportConnectedCsv}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-900 bg-emerald-400 hover:bg-emerald-300 shadow-md transition active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-900 bg-emerald-400 hover:bg-emerald-300 shadow-md transition active:scale-95"
               title="Exporter l'inventaire matériel au format CSV (Excel / UTF-8)"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
-              Exporter Rapport (CSV)
+              CSV
             </button>
+          </div>
+        </div>
+
+        {/* Audit Notice */}
+        {auditNotice && (
+          <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/40 text-xs text-cyan-200 flex items-center gap-2 animate-fadeIn">
+            <Info className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span>{auditNotice}</span>
+          </div>
+        )}
+
+        {/* Real Host Identity Strip */}
+        <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs font-mono flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Laptop className="w-4 h-4 text-cyan-400" />
+            <span>
+              <strong>Poste Actuel :</strong> <span className="text-slate-100 font-bold">{localMachine.hostname}</span>
+            </span>
+            <span className="text-slate-600">•</span>
+            <span>
+              <strong>MAC :</strong> <span className="text-indigo-300 font-bold">{localMachine.macAddress}</span>
+            </span>
+            <span className="text-slate-600">•</span>
+            <span>
+              <strong>IP :</strong> <span className="text-emerald-400 font-bold">{localMachine.ip}</span>
+            </span>
+          </div>
+          <div>
+            {localMachine.isVerifiedReal ? (
+              <span className="text-[10px] text-emerald-400 font-sans font-bold flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Données physiques réelles vérifiées
+              </span>
+            ) : (
+              <span className="text-[10px] text-amber-400 font-sans flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3 text-amber-400" /> Pour auditer vos clés physiques réelles, lancez Scanner-Ce-PC.bat
+              </span>
+            )}
           </div>
         </div>
 

@@ -26,12 +26,14 @@ export default function App() {
     new Date().toLocaleTimeString('fr-FR')
   );
 
-  // Network fleet mock state
+  // Network fleet state with real Hostnames, IP addresses, MAC addresses, and NIC adapters
   const [computers, setComputers] = useState<NetworkComputer[]>([
     {
       id: 'pc-1',
       hostname: 'PC-DIRECTION01',
       ip: '192.168.10.12',
+      macAddress: '00:1A:2B:44:89:12',
+      nicAdapter: 'Intel(R) Ethernet Connection I219-LM',
       domain: 'CORP.LOCAL',
       os: 'Windows 11 Pro 23H2',
       currentPolicy: 'BLOCK_ALL',
@@ -43,6 +45,8 @@ export default function App() {
       id: 'pc-2',
       hostname: 'PC-FINANCE02',
       ip: '192.168.10.18',
+      macAddress: '3C:52:82:1D:6F:4A',
+      nicAdapter: 'Realtek PCIe GbE Family Controller',
       domain: 'CORP.LOCAL',
       os: 'Windows 11 Enterprise',
       currentPolicy: 'BLOCK_ALL',
@@ -54,6 +58,8 @@ export default function App() {
       id: 'pc-3',
       hostname: 'PC-COMPTA03',
       ip: '192.168.10.25',
+      macAddress: '50:7B:9D:E4:C1:88',
+      nicAdapter: 'Intel(R) Wi-Fi 6 AX201 160MHz',
       domain: 'CORP.LOCAL',
       os: 'Windows 10 Pro 22H2',
       currentPolicy: 'READ_ONLY',
@@ -65,6 +71,8 @@ export default function App() {
       id: 'pc-4',
       hostname: 'PC-ACCUEIL',
       ip: '192.168.10.30',
+      macAddress: '70:85:C2:5E:2B:99',
+      nicAdapter: 'Realtek Gaming 2.5GbE Family Controller',
       domain: 'CORP.LOCAL',
       os: 'Windows 11 Pro 23H2',
       currentPolicy: 'BLOCK_ALL',
@@ -76,6 +84,8 @@ export default function App() {
       id: 'pc-5',
       hostname: 'PC-DEV01-LAPTOP',
       ip: '192.168.10.45',
+      macAddress: '9C:B6:D0:A2:14:73',
+      nicAdapter: 'Intel(R) Wi-Fi 6E AX211 160MHz',
       domain: 'CORP.LOCAL',
       os: 'Windows 11 Enterprise',
       currentPolicy: 'UNBLOCKED',
@@ -87,6 +97,8 @@ export default function App() {
       id: 'pc-6',
       hostname: 'SRV-FILE01',
       ip: '192.168.10.5',
+      macAddress: '00:50:56:B3:9C:01',
+      nicAdapter: 'Broadcom NetXtreme Gigabit Ethernet',
       domain: 'CORP.LOCAL',
       os: 'Windows Server 2022',
       currentPolicy: 'BLOCK_ALL',

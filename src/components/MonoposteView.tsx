@@ -22,11 +22,25 @@ import {
   Monitor,
   Check,
   FileText,
-  Download
+  Download,
+  Copy,
+  Edit3,
+  Network,
+  Laptop,
+  Globe,
+  Save,
+  Cpu,
+  Upload,
+  ClipboardCheck,
+  ClipboardCopy,
+  Sparkles,
+  HelpCircle,
+  X
 } from 'lucide-react';
-import { PolicyMode } from '../types/usbPolicy';
+import { PolicyMode, LocalMachineInfo } from '../types/usbPolicy';
 import { SCRIPT_TEMPLATES } from '../data/scriptTemplates';
 import { downloadText } from '../utils/zipGenerator';
+import { useLocalMachine, POWERSHELL_ONE_LINER } from '../context/LocalMachineContext';
 
 interface MonoposteViewProps {
   policyMode: PolicyMode;
@@ -160,6 +174,155 @@ export const MonoposteView: React.FC<MonoposteViewProps> = ({
   const [testDevice, setTestDevice] = useState<'usb' | 'mouse' | 'keyboard' | 'hdd' | 'phone' | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
 
+  // Local PC Real Inventory State from Global Context
+  const {
+    localMachine,
+    setLocalMachine,
+    updateLocalMachine,
+    importScanJsonContent,
+    importFromClipboard,
+    downloadScannerBat,
+    copyPowerShellCommand,
+    detectBrowserHardwareAndIp,
+  } = useLocalMachine();
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isDetectingLocal, setIsDetectingLocal] = useState(false);
+  const [isEditingLocal, setIsEditingLocal] = useState(false);
+  const [showScanAssistantModal, setShowScanAssistantModal] = useState(false);
+  const [pastedRawText, setPastedRawText] = useState('');
+  const [editHostname, setEditHostname] = useState(localMachine.hostname);
+  const [editIp, setEditIp] = useState(localMachine.ip);
+  const [editMac, setEditMac] = useState(localMachine.macAddress);
+  const [editAdapter, setEditAdapter] = useState(localMachine.nicAdapter);
+  const [editDomain, setEditDomain] = useState(localMachine.domainOrWorkgroup);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [detectionNotice, setDetectionNotice] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setEditHostname(localMachine.hostname);
+    setEditIp(localMachine.ip);
+    setEditMac(localMachine.macAddress);
+    setEditAdapter(localMachine.nicAdapter);
+    setEditDomain(localMachine.domainOrWorkgroup);
+  }, [localMachine]);
+
+  const handleCopyText = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(label);
+    setTimeout(() => setCopiedField(null), 2500);
+  };
+
+  const handleCopyPowerShell = async () => {
+    const ok = await copyPowerShellCommand();
+    if (ok) {
+      setDetectionNotice(
+        "⚡ Commande PowerShell copiée ! Ouvrez PowerShell (Win+X > Terminal), collez la commande (Ctrl+V) et appuyez sur Entrée. Puis revenez ici et cliquez sur [📋 Coller le Scan]."
+      );
+    } else {
+      setDetectionNotice("Commande PowerShell prête dans l'Assistant de Scan.");
+      setShowScanAssistantModal(true);
+    }
+    setTimeout(() => setDetectionNotice(null), 10000);
+  };
+
+  const handlePasteFromClipboard = async () => {
+    setDetectionNotice("Lecture du presse-papiers...");
+    const res = await importFromClipboard();
+    setDetectionNotice(res.message);
+    if (!res.success) {
+      setShowScanAssistantModal(true);
+    }
+    setTimeout(() => setDetectionNotice(null), 8000);
+  };
+
+  const handleAnalyzeRawPastedText = () => {
+    if (!pastedRawText.trim()) return;
+    const res = importScanJsonContent(pastedRawText.trim());
+    setDetectionNotice(res.message);
+    if (res.success) {
+      setPastedRawText('');
+      setShowScanAssistantModal(false);
+    }
+    setTimeout(() => setDetectionNotice(null), 8000);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        const result = importScanJsonContent(content);
+        setDetectionNotice(result.message);
+        setTimeout(() => setDetectionNotice(null), 8000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleDetectLocalNetwork = async () => {
+    setIsDetectingLocal(true);
+    setDetectionNotice("Sondage de l'adresse IP et de l'environnement système...");
+    const detected = await detectBrowserHardwareAndIp();
+    setIsDetectingLocal(false);
+    if (detected) {
+      setDetectionNotice(
+        `IP détectée : ${detected}. Note : Pour charger votre vrai nom Windows et votre adresse MAC sans erreur, cliquez sur [⚡ Copier Commande PowerShell] ou [1. Scanner ce PC].`
+      );
+    } else {
+      setDetectionNotice(
+        "Pour afficher votre vrai nom de PC et votre adresse MAC sans restriction du navigateur, utilisez la commande PowerShell 1-ligne."
+      );
+    }
+    setTimeout(() => setDetectionNotice(null), 8000);
+  };
+
+  const handleSaveLocalInventory = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateLocalMachine({
+      hostname: editHostname.trim().toUpperCase() || localMachine.hostname,
+      ip: editIp.trim() || localMachine.ip,
+      macAddress: editMac.trim().toUpperCase() || localMachine.macAddress,
+      nicAdapter: editAdapter.trim() || localMachine.nicAdapter,
+      domainOrWorkgroup: editDomain.trim().toUpperCase() || localMachine.domainOrWorkgroup,
+      isVerifiedReal: true,
+      scanSource: 'MANUAL_ENTRY',
+    });
+    setIsEditingLocal(false);
+    setDetectionNotice('Identifiants de votre PC enregistrés avec succès dans votre navigateur !');
+    setTimeout(() => setDetectionNotice(null), 5000);
+  };
+
+  const handleExportLocalJson = () => {
+    const payload = {
+      reportType: "FICHE D'INVENTAIRE MATÉRIEL ET RÉSEAU DU POSTE LOCAL",
+      generatedAt: new Date().toISOString(),
+      machine: {
+        nomReelHostname: localMachine.hostname,
+        adresseMac: localMachine.macAddress,
+        adresseIp: localMachine.ip,
+        carteReseauNic: localMachine.nicAdapter,
+        domaineOuWorkgroup: localMachine.domainOrWorkgroup,
+        systemeExploitation: currentWinSpec.name,
+        architecture: currentWinSpec.architecture,
+        masqueSousReseau: localMachine.subnetMask,
+        passerelleParDefaut: localMachine.defaultGateway,
+        serveursDns: localMachine.dnsServer,
+        isVerifiedReal: localMachine.isVerifiedReal,
+        scanSource: localMachine.scanSource,
+      },
+      politiqueUsbCourante: {
+        mode: policyMode,
+        sourisEtClavierProteges: true,
+        derniereApplication: lastAppliedTime,
+      }
+    };
+    downloadText(JSON.stringify(payload, null, 2), `Inventaire_${localMachine.hostname}_${localMachine.macAddress.replace(/:/g, '')}.json`);
+  };
+
   const currentWinSpec =
     SUPPORTED_WINDOWS_VERSIONS.find((v) => v.id === selectedWindowsVersion) ||
     SUPPORTED_WINDOWS_VERSIONS[0];
@@ -272,6 +435,572 @@ export const MonoposteView: React.FC<MonoposteViewProps> = ({
             <span className="text-slate-200">{currentWinSpec.releaseYear}</span>
           </div>
         </div>
+      </div>
+
+      {/* FICHE D'INVENTAIRE MATÉRIEL ET RÉSEAU DU POSTE LOCAL (Nom Réel, MAC & IP) */}
+      <div className="bg-slate-900/90 border border-cyan-500/30 rounded-2xl p-5 shadow-xl space-y-4">
+        {/* Hidden File Input for JSON Scan Import */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl border ${localMachine.isVerifiedReal ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'}`}>
+              <Laptop className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-bold text-slate-100">
+                  Fiche d'Inventaire Matériel & Réseau du Poste Local
+                </h3>
+                {localMachine.isVerifiedReal ? (
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    IDENTITÉ PHYSIQUE VÉRIFIÉE (SCAN RÉEL)
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-amber-400" />
+                    SCAN LOCAL EN ATTENTE (SANDBOX DU NAVIGATEUR)
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Identification officielle : Nom NetBIOS réel, adresse MAC physique de la carte réseau et adresse IP.
+              </p>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handlePasteFromClipboard}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow flex items-center gap-1.5 transition active:scale-95"
+              title="Coller instantanément le résultat du scan depuis votre presse-papiers Windows"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              1. Coller le Scan (1-Clic)
+            </button>
+
+            <button
+              onClick={handleCopyPowerShell}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-slate-950 shadow flex items-center gap-1.5 transition active:scale-95"
+              title="Copier la commande PowerShell 1-ligne pour extraire vos vraies coordonnées sans rien télécharger"
+            >
+              <ClipboardCopy className="w-3.5 h-3.5" />
+              2. Commande PowerShell (3s)
+            </button>
+
+            <button
+              onClick={downloadScannerBat}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow flex items-center gap-1.5 transition active:scale-95"
+              title="Télécharger le script 1-clic pour scanner ce PC Windows physique"
+            >
+              <Download className="w-3.5 h-3.5" />
+              3. Scanner ce PC (.bat)
+            </button>
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 flex items-center gap-1.5 transition active:scale-95"
+              title="Importer le fichier mon_pc_scan.json généré par le script sur votre Bureau"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Importer (.json)
+            </button>
+
+            <button
+              onClick={() => setIsEditingLocal(!isEditingLocal)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
+              {isEditingLocal ? 'Fermer' : 'Modifier / Saisir'}
+            </button>
+
+            <button
+              onClick={() => setShowScanAssistantModal(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 flex items-center gap-1.5 transition"
+              title="Ouvrir l'assistant d'aide pour le scan sans erreur"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              Assistant de Scan
+            </button>
+
+            <button
+              onClick={handleExportLocalJson}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 flex items-center gap-1.5 transition"
+              title="Télécharger la fiche d'inventaire de ce PC au format JSON"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Fiche JSON
+            </button>
+          </div>
+        </div>
+
+        {/* Notice feedback */}
+        {detectionNotice && (
+          <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/40 text-xs text-cyan-200 flex items-center gap-2 animate-fadeIn">
+            <Info className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span>{detectionNotice}</span>
+          </div>
+        )}
+
+        {/* Explanatory Banner: Why Web Browser Sandbox Cannot Read MAC Address Silently */}
+        {!localMachine.isVerifiedReal && (
+          <div className="p-4 rounded-xl bg-slate-950 border border-cyan-500/40 text-xs space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="font-bold text-amber-300 flex items-center gap-2 text-sm">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                Pourquoi le scan du navigateur ne peut pas deviner votre nom de PC et votre adresse MAC ?
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono">
+                Standard Sécurité W3C (Anti-Fingerprinting)
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              Par mesure de sécurité obligatoire, <strong>les navigateurs web (Chrome, Edge, Firefox) interdisent formellement à tout site web</strong> d'accéder directement à l'adresse MAC physique de votre carte réseau ou au nom NetBIOS de votre ordinateur. Pour charger vos coordonnées physiques réelles <strong>sans résultat erroné</strong>, utilisez l'une des solutions directes ci-dessous :
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              {/* Method 1 */}
+              <div className="bg-slate-900/90 border border-cyan-800/40 rounded-lg p-3 space-y-2">
+                <div className="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  Méthode 1 : PowerShell 1-Ligne (3s)
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Cliquez ci-dessous, collez dans PowerShell (Ctrl+V) et appuyez sur Entrée :
+                </p>
+                <button
+                  onClick={handleCopyPowerShell}
+                  className="px-2.5 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-[11px] shadow flex items-center gap-1 w-full justify-center transition active:scale-95"
+                >
+                  <ClipboardCopy className="w-3.5 h-3.5" />
+                  Copier la Commande
+                </button>
+              </div>
+
+              {/* Method 2 */}
+              <div className="bg-slate-900/90 border border-emerald-800/40 rounded-lg p-3 space-y-2">
+                <div className="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">
+                  <ClipboardCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  Méthode 2 : Coller le Scan (1-Clic)
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Dès que la commande a été exécutée, vos données sont dans le presse-papiers :
+                </p>
+                <button
+                  onClick={handlePasteFromClipboard}
+                  className="px-2.5 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] shadow flex items-center gap-1 w-full justify-center transition active:scale-95"
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5" />
+                  Coller le Scan (1-Clic)
+                </button>
+              </div>
+
+              {/* Method 3 */}
+              <div className="bg-slate-900/90 border border-amber-800/40 rounded-lg p-3 space-y-2">
+                <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                  <Download className="w-3.5 h-3.5 text-amber-400" />
+                  Méthode 3 : Script .BAT ou Saisie
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Téléchargez le mini-scanner autonome ou tapez manuellement vos identifiants :
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={downloadScannerBat}
+                    className="px-2 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] shadow flex items-center gap-1 flex-1 justify-center transition active:scale-95"
+                  >
+                    <Download className="w-3 h-3" />
+                    Scanner (.bat)
+                  </button>
+                  <button
+                    onClick={() => setIsEditingLocal(true)}
+                    className="px-2 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[10px] border border-slate-700 flex items-center gap-1 flex-1 justify-center transition"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    Saisir
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Verified Banner */}
+        {localMachine.isVerifiedReal && (
+          <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-xs text-emerald-200 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>
+                <strong>Coordonnées réelles appliquées :</strong> {localMachine.hostname} • MAC : <code className="font-mono text-emerald-300 font-bold">{localMachine.macAddress}</code> • IP : <code className="font-mono text-emerald-300">{localMachine.ip}</code> ({localMachine.scanSource === 'LOCAL_SCRIPT_SCAN' ? 'Extrait via Scanner-Ce-PC.bat' : 'Saisi manuellement'}).
+              </span>
+            </div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[11px] text-emerald-300 underline hover:text-white shrink-0"
+            >
+              Réimporter un nouveau scan
+            </button>
+          </div>
+        )}
+
+        {/* Inline Editing Form */}
+        {isEditingLocal && (
+          <form onSubmit={handleSaveLocalInventory} className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+              <Edit3 className="w-4 h-4 text-cyan-400" />
+              Correction Manuelle des Coordonnées Réelles de votre PC Windows
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+              <div>
+                <label className="block text-[11px] text-slate-400 font-medium mb-1">
+                  Nom Réel Machine (Hostname NetBIOS)
+                </label>
+                <input
+                  type="text"
+                  value={editHostname}
+                  onChange={(e) => setEditHostname(e.target.value)}
+                  placeholder="Ex: MON-PC-BUREAU"
+                  className="w-full px-3 py-1.5 rounded bg-slate-800 border border-slate-700 text-slate-100 font-mono text-xs focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-400 font-medium mb-1">
+                  Adresse MAC Physique (Format XX:XX:XX:XX:XX:XX)
+                </label>
+                <input
+                  type="text"
+                  value={editMac}
+                  onChange={(e) => setEditMac(e.target.value)}
+                  placeholder="Ex: 00:1A:2B:3C:4D:5E"
+                  className="w-full px-3 py-1.5 rounded bg-slate-800 border border-slate-700 text-slate-100 font-mono text-xs focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-400 font-medium mb-1">
+                  Adresse IP Locale (IPv4)
+                </label>
+                <input
+                  type="text"
+                  value={editIp}
+                  onChange={(e) => setEditIp(e.target.value)}
+                  placeholder="Ex: 192.168.1.50"
+                  className="w-full px-3 py-1.5 rounded bg-slate-800 border border-slate-700 text-slate-100 font-mono text-xs focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-400 font-medium mb-1">
+                  Contrôleur Réseau (NIC)
+                </label>
+                <input
+                  type="text"
+                  value={editAdapter}
+                  onChange={(e) => setEditAdapter(e.target.value)}
+                  placeholder="Ex: Realtek PCIe GbE ou Intel Wi-Fi"
+                  className="w-full px-3 py-1.5 rounded bg-slate-800 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-400 font-medium mb-1">
+                  Domaine ou Groupe de Travail
+                </label>
+                <input
+                  type="text"
+                  value={editDomain}
+                  onChange={(e) => setEditDomain(e.target.value)}
+                  placeholder="Ex: WORKGROUP ou DOMAIN.LOCAL"
+                  className="w-full px-3 py-1.5 rounded bg-slate-800 border border-slate-700 text-slate-100 font-mono text-xs focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+              <div className="flex items-end gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 py-1.5 px-3 rounded bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs transition flex items-center justify-center gap-1.5 shadow"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  Enregistrer Définitivement
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingLocal(false)}
+                  className="py-1.5 px-3 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs transition"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+
+        {/* 4 Technical Inventory Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Card 1: Machine Hostname */}
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between hover:border-slate-700 transition">
+            <div className="flex items-center justify-between text-slate-400 mb-1">
+              <span className="text-[11px] font-medium uppercase tracking-wider flex items-center gap-1.5">
+                <Laptop className="w-3.5 h-3.5 text-cyan-400" />
+                Nom Réel Machine
+              </span>
+              <button
+                onClick={() => handleCopyText(localMachine.hostname, 'hostname')}
+                className="text-slate-500 hover:text-cyan-400 transition"
+                title="Copier le nom de la machine"
+              >
+                {copiedField === 'hostname' ? (
+                  <span className="text-[10px] text-emerald-400 font-bold">Copié !</span>
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+            <div className="text-base font-bold text-slate-100 font-mono truncate" title={localMachine.hostname}>
+              {localMachine.hostname}
+            </div>
+            <div className="text-[10px] text-slate-400 font-sans mt-1">
+              Domaine : <span className="text-cyan-300 font-mono">{localMachine.domainOrWorkgroup}</span>
+            </div>
+          </div>
+
+          {/* Card 2: MAC Address */}
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between hover:border-slate-700 transition">
+            <div className="flex items-center justify-between text-slate-400 mb-1">
+              <span className="text-[11px] font-medium uppercase tracking-wider flex items-center gap-1.5">
+                <Network className="w-3.5 h-3.5 text-indigo-400" />
+                Adresse MAC Physique
+              </span>
+              <button
+                onClick={() => handleCopyText(localMachine.macAddress, 'mac')}
+                className="text-slate-500 hover:text-indigo-400 transition"
+                title="Copier l'adresse MAC"
+              >
+                {copiedField === 'mac' ? (
+                  <span className="text-[10px] text-emerald-400 font-bold">Copié !</span>
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+            <div className="text-base font-bold text-indigo-300 font-mono tracking-wider">
+              {localMachine.macAddress}
+            </div>
+            <div className="text-[10px] text-slate-400 truncate mt-1" title={localMachine.nicAdapter}>
+              {localMachine.nicAdapter}
+            </div>
+          </div>
+
+          {/* Card 3: IP Address */}
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between hover:border-slate-700 transition">
+            <div className="flex items-center justify-between text-slate-400 mb-1">
+              <span className="text-[11px] font-medium uppercase tracking-wider flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                Adresse IP Locale
+              </span>
+              <button
+                onClick={() => handleCopyText(localMachine.ip, 'ip')}
+                className="text-slate-500 hover:text-emerald-400 transition"
+                title="Copier l'adresse IP"
+              >
+                {copiedField === 'ip' ? (
+                  <span className="text-[10px] text-emerald-400 font-bold">Copié !</span>
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+            <div className="text-base font-bold text-emerald-300 font-mono">
+              {localMachine.ip}
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1">
+              Masque : <span className="font-mono text-slate-300">{localMachine.subnetMask}</span>
+            </div>
+          </div>
+
+          {/* Card 4: Operating System & USB Policy */}
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between hover:border-slate-700 transition">
+            <div className="flex items-center justify-between text-slate-400 mb-1">
+              <span className="text-[11px] font-medium uppercase tracking-wider flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                Politique USB Active
+              </span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Poste opérationnel" />
+            </div>
+            <div className="text-sm font-bold truncate">
+              {policyMode === 'BLOCK_ALL' && <span className="text-rose-400">Verrouillage Total</span>}
+              {policyMode === 'READ_ONLY' && <span className="text-amber-400">Lecture Seule</span>}
+              {policyMode === 'BLOCK_EXECUTE' && <span className="text-indigo-400">Anti-Exécutables</span>}
+              {policyMode === 'UNBLOCKED' && <span className="text-emerald-400">Débloqué Standard</span>}
+            </div>
+            <div className="text-[10px] text-emerald-400/90 flex items-center gap-1 mt-1">
+              <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+              <span>Souris & Clavier HID Préservés</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Windows PowerShell One-Liner Quick Copy Box */}
+        <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="text-slate-300 flex items-center gap-2">
+            <Terminal className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span>
+              <strong>Extraction Réelle 1-Ligne (Sans Téléchargement) :</strong> Exécutez dans PowerShell pour copier vos vraies données dans le presse-papiers.
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleCopyPowerShell}
+              className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-[11px] flex items-center gap-1.5 transition active:scale-95 shadow"
+              title="Copier la commande PowerShell universelle qui copie directement les coordonnées dans votre presse-papiers"
+            >
+              <ClipboardCopy className="w-3.5 h-3.5" />
+              <span>Copier Commande PowerShell</span>
+            </button>
+
+            <button
+              onClick={handlePasteFromClipboard}
+              className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] flex items-center gap-1.5 transition active:scale-95 shadow"
+              title="Coller immédiatement les données copiées par PowerShell"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              <span>Coller le Scan</span>
+            </button>
+
+            <button
+              onClick={() => setShowScanAssistantModal(true)}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] border border-slate-700 flex items-center gap-1 transition"
+            >
+              <HelpCircle className="w-3 h-3 text-cyan-400" />
+              <span>Aide / Assistant</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Scan Assistant Modal */}
+        {showScanAssistantModal && (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <Laptop className="w-5 h-5 text-cyan-400" />
+                  <h3 className="text-lg font-bold text-slate-100">
+                    Assistant de Détection & Scan Réel de Ce PC
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowScanAssistantModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs text-slate-300">
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-cyan-500/30 space-y-2">
+                  <div className="font-bold text-cyan-300 flex items-center gap-2">
+                    <Info className="w-4 h-4 text-cyan-400" />
+                    Pourquoi le navigateur affiche "Scan en attente" ?
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Les règles de sécurité du W3C interdisent formellement aux pages web d'accéder au matériel physique (adresse MAC et nom NetBIOS) sans interaction locale. Pour charger vos coordonnées exactes :
+                  </p>
+                </div>
+
+                {/* Option 1: PowerShell 1-Liner */}
+                <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-100 text-xs flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                      Option 1 (Recommandée - 3 secondes) : Commande PowerShell 1-Ligne
+                    </span>
+                    <button
+                      onClick={handleCopyPowerShell}
+                      className="px-2.5 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-[11px] flex items-center gap-1 transition"
+                    >
+                      <ClipboardCopy className="w-3 h-3" />
+                      Copier
+                    </button>
+                  </div>
+                  <div className="p-2.5 rounded bg-slate-900 border border-slate-800 font-mono text-[10px] text-cyan-200 overflow-x-auto whitespace-pre-wrap break-all select-all">
+                    {POWERSHELL_ONE_LINER}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>1. Ouvrez PowerShell &gt; Collez la commande &gt; Entrée.</span>
+                    <button
+                      onClick={handlePasteFromClipboard}
+                      className="px-3 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition"
+                    >
+                      <ClipboardCheck className="w-3.5 h-3.5" />
+                      2. Cliquer pour Coller le Résultat
+                    </button>
+                  </div>
+                </div>
+
+                {/* Option 2: Raw Text / JSON Area */}
+                <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2">
+                  <span className="font-bold text-slate-100 text-xs flex items-center gap-1.5">
+                    <Edit3 className="w-3.5 h-3.5 text-indigo-400" />
+                    Option 2 : Coller le texte brut ou le JSON ici
+                  </span>
+                  <p className="text-[11px] text-slate-400">
+                    Vous pouvez coller le JSON du scan, ou le résultat d'un <code>ipconfig /all</code> ou <code>getmac</code> :
+                  </p>
+                  <textarea
+                    rows={3}
+                    value={pastedRawText}
+                    onChange={(e) => setPastedRawText(e.target.value)}
+                    placeholder='Exemple : {"hostname":"MON-PC","ip":"192.168.1.25","macAddress":"00:1A:2B:3C:4D:5E"}'
+                    className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-100 font-mono text-xs focus:outline-none focus:border-cyan-500"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleAnalyzeRawPastedText}
+                      disabled={!pastedRawText.trim()}
+                      className="px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      Analyser et Appliquer Immédiatement
+                    </button>
+                  </div>
+                </div>
+
+                {/* Option 3: Mini-Scanner .BAT */}
+                <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-3">
+                  <div>
+                    <span className="font-bold text-slate-100 text-xs block">
+                      Option 3 : Télécharger Scanner-Ce-PC.bat
+                    </span>
+                    <span className="text-[11px] text-slate-400 block mt-0.5">
+                      Génère le fichier <code>mon_pc_scan.json</code> sur votre Bureau et copie les données.
+                    </span>
+                  </div>
+                  <button
+                    onClick={downloadScannerBat}
+                    className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Télécharger .bat
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800 flex justify-end">
+                <button
+                  onClick={() => setShowScanAssistantModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Real Machine Instant 1-Click Execution Banner */}

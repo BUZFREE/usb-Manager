@@ -917,12 +917,44 @@ class NetworkScanner:
         except (socket.timeout, ConnectionRefusedError, OSError):
             return False
 
+    def get_mac_address(self, ip: str) -> str:
+        """Résout l'adresse MAC physique réelle via l'API Windows SendARP ou la table ARP."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+            send_arp = ctypes.windll.iphlpapi.SendARP
+            send_arp.argtypes = [wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p, ctypes.POINTER(wintypes.ULONG)]
+            send_arp.restype = wintypes.DWORD
+
+            dest_ip = socket.inet_aton(ip)
+            dest_ip_dword = struct.unpack("!I", dest_ip)[0]
+            dest_ip_host = socket.ntohl(dest_ip_dword)
+
+            mac_buf = (ctypes.c_byte * 6)()
+            mac_len = wintypes.ULONG(6)
+            res = send_arp(dest_ip_host, 0, mac_buf, ctypes.byref(mac_len))
+            if res == 0:
+                return ":".join(f"{b & 0xff:02X}" for b in mac_buf)
+        except Exception:
+            pass
+
+        try:
+            import subprocess, re
+            output = subprocess.check_output(["arp", "-a", ip], stderr=subprocess.DEVNULL, text=True)
+            m = re.search(r"([0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2})", output)
+            if m:
+                return m.group(1).replace("-", ":").upper()
+        except Exception:
+            pass
+
+        return "Non résolu (Hors ARP)"
+
     def scan_subnet(self, subnet_prefix: str = "192.168.1") -> List[Dict[str, Any]]:
-        """Scanne une plage IP de type 192.168.1.1 à 192.168.1.254."""
+        """Scanne une plage IP de type 192.168.1.1 à 192.168.1.254 avec résolution de nom NetBIOS et adresse MAC."""
         hosts = [f"{subnet_prefix}.{i}" for i in range(1, 255)]
         online_computers = []
 
-        print(f"[RÉSEAU] Scan multi-threads du réseau {subnet_prefix}.0/24...")
+        print(f"[RÉSEAU] Scan multi-threads du réseau {subnet_prefix}.0/24 avec résolution MAC & Nom...")
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_threads) as executor:
             future_to_ip = {executor.submit(self.ping_host, ip): ip for ip in hosts}
@@ -935,16 +967,19 @@ class NetworkScanner:
                         except Exception:
                             hostname = f"PC-{ip.replace('.', '-')}"
                         
+                        mac = self.get_mac_address(ip)
+
                         online_computers.append({
                             "ip": ip,
                             "hostname": hostname,
+                            "macAddress": mac,
                             "status": "online"
                         })
-                        print(f"  [+] Machine trouvée : {hostname} ({ip})")
+                        print(f"  [+] Machine trouvée : {hostname} | IP: {ip} | MAC: {mac}")
                 except Exception:
                     pass
 
-        print(f"[RÉSEAU] Scan terminé : {len(online_computers)} machines en ligne.")
+        print(f"[RÉSEAU] Scan terminé : {len(online_computers)} machines en ligne avec adresses MAC.")
         return online_computers
 
     def apply_remote_policy(self, host: str, mode: PolicyMode, user: str = None, password: str = None) -> bool:

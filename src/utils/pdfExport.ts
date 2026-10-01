@@ -389,3 +389,101 @@ export function exportConnectedDevicesCsv(
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+export function exportFleetInventoryCsv(
+  computers: Array<{
+    id: string;
+    hostname: string;
+    ip: string;
+    macAddress: string;
+    nicAdapter?: string;
+    domain: string;
+    os: string;
+    currentPolicy: string;
+    status: string;
+    lastSync: string;
+  }>,
+  metadata: {
+    organization: string;
+    dateGenerated: string;
+    auditor: string;
+  }
+) {
+  const BOM = '\uFEFF';
+  let csv = BOM;
+  csv += `# BORDEREAU OFFICIEL D'INVENTAIRE DU PARC INFORMATIQUE (NOMS REELS, ADRESSES MAC & IP)\n`;
+  csv += `# Organisation : ${metadata.organization}\n`;
+  csv += `# Date de generation : ${metadata.dateGenerated}\n`;
+  csv += `# Responsable d'inventaire : ${metadata.auditor}\n`;
+  csv += `# Total des machines recensees : ${computers.length}\n`;
+  csv += `# --------------------------------------------------------------------------------\n`;
+  csv += `Nom_Reel_Hostname;Adresse_IP;Adresse_MAC;Carte_Reseau_NIC;Domaine_AD;Systeme_Exploitation;Politique_USB_Active;Statut_Reseau;Derniere_Synchro\n`;
+
+  for (const c of computers) {
+    csv += `"${c.hostname}";"${c.ip}";"${c.macAddress}";"${c.nicAdapter || 'Ethernet/Wi-Fi standard'}";"${c.domain}";"${c.os}";"${c.currentPolicy}";"${c.status.toUpperCase()}";"${c.lastSync}"\n`;
+  }
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Inventaire_Parc_PC_MAC_IP_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export function exportFleetInventoryJson(
+  computers: Array<{
+    id: string;
+    hostname: string;
+    ip: string;
+    macAddress: string;
+    nicAdapter?: string;
+    domain: string;
+    os: string;
+    currentPolicy: string;
+    status: string;
+    lastSync: string;
+  }>,
+  metadata: {
+    organization: string;
+    dateGenerated: string;
+    auditor: string;
+  }
+) {
+  const payload = {
+    reportTitle: "Bordereau Officiel d'Inventaire Matériel & Réseau du Parc PC",
+    metadata: {
+      organization: metadata.organization,
+      auditor: metadata.auditor,
+      dateGenerated: metadata.dateGenerated,
+      totalComputers: computers.length,
+      onlineComputers: computers.filter((c) => c.status === 'online').length,
+    },
+    inventory: computers.map((c) => ({
+      hostname: c.hostname,
+      ipAddress: c.ip,
+      macAddress: c.macAddress,
+      nicAdapter: c.nicAdapter || 'Contrôleur Réseau Standard',
+      domain: c.domain,
+      operatingSystem: c.os,
+      activeUsbPolicy: c.currentPolicy,
+      status: c.status,
+      lastSync: c.lastSync,
+    })),
+  };
+
+  const jsonString = JSON.stringify(payload, null, 2);
+  const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Inventaire_Parc_PC_MAC_IP_${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+

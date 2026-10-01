@@ -29,12 +29,36 @@ export interface NetworkComputer {
   id: string;
   hostname: string;
   ip: string;
+  macAddress: string;
+  nicAdapter?: string;
   domain: string;
   os: string;
   currentPolicy: PolicyMode;
   status: 'online' | 'offline' | 'deploying' | 'error';
   lastSync: string;
   selected?: boolean;
+}
+
+export interface LocalMachineInfo {
+  hostname: string;
+  ip: string;
+  macAddress: string;
+  domainOrWorkgroup: string;
+  os: string;
+  nicAdapter: string;
+  subnetMask: string;
+  defaultGateway: string;
+  dnsServer: string;
+  dhcpEnabled: boolean;
+  status: 'online' | 'offline';
+  lastDetected: string;
+  isVerifiedReal: boolean;
+  scanSource: 'LOCAL_SCRIPT_SCAN' | 'MANUAL_ENTRY' | 'BROWSER_PROBE' | 'DEFAULT_UNSCANNED';
+  publicIp?: string;
+  cpuCores?: number;
+  deviceMemoryGb?: number;
+  screenResolution?: string;
+  detectedUsbDevicesCount?: number;
 }
 
 export interface DeploymentLog {

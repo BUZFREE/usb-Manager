@@ -17,11 +17,15 @@ import {
   Search,
   Cpu,
   ListFilter,
-  FileCode
+  FileCode,
+  HeartPulse,
+  Building2,
+  UserCheck
 } from 'lucide-react';
 import { PolicyMode } from '../types/usbPolicy';
 import { useTheme } from '../context/ThemeContext';
 import { generatePythonProjectZip, downloadBlob } from '../utils/zipGenerator';
+import { DmeUserSession } from './DmeWelcomeModal';
 
 interface HeaderProps {
   currentTab: string;
@@ -29,6 +33,8 @@ interface HeaderProps {
   policyMode: PolicyMode;
   onRefreshStatus?: () => void;
   onToggleSidebarMobile?: () => void;
+  onOpenDmeModal?: () => void;
+  connectedUser?: DmeUserSession;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,6 +43,8 @@ export const Header: React.FC<HeaderProps> = ({
   policyMode,
   onRefreshStatus,
   onToggleSidebarMobile,
+  onOpenDmeModal,
+  connectedUser,
 }) => {
   const { theme, setTheme } = useTheme();
   const [isZipping, setIsZipping] = useState(false);
@@ -145,6 +153,28 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right: Actions, Status & Theme Switcher */}
           <div className="flex items-center gap-2.5">
+            {/* Mr. BAZ AMAR / DME Santé Identification Button */}
+            {onOpenDmeModal && (
+              <button
+                onClick={onOpenDmeModal}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-xs flex items-center gap-2 transition text-slate-200 cursor-pointer shadow-sm"
+                title="Présentation du projet par Mr. BAZ AMAR (CHU Béni Messous Alger, 10-2026) • Identification Santé DME"
+              >
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-cyan-500 to-emerald-400 text-slate-950 font-extrabold text-[11px] flex items-center justify-center shrink-0">
+                  BA
+                </div>
+                <div className="text-left hidden md:block">
+                  <div className="text-[11px] font-extrabold text-slate-100 flex items-center gap-1.5">
+                    <span>{connectedUser?.fullName || 'Mr. BAZ AMAR'}</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 font-mono font-bold border border-cyan-800/40">DME</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate max-w-[150px]">
+                    {connectedUser?.email || 'CHU Béni Messous'}
+                  </div>
+                </div>
+              </button>
+            )}
+
             {getStatusBadge()}
 
             {/* Quick Print Center shortcut button */}

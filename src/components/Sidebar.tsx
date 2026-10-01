@@ -23,7 +23,9 @@ import {
   X,
   Menu,
   Wifi,
-  Router
+  Router,
+  HeartPulse,
+  Building2
 } from 'lucide-react';
 import { PolicyMode } from '../types/usbPolicy';
 import { useTheme, ThemeMode } from '../context/ThemeContext';
@@ -52,6 +54,7 @@ interface SidebarProps {
   isOpenMobile: boolean;
   setIsOpenMobile: (open: boolean) => void;
   computersCount?: number;
+  onOpenDmeModal?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -62,6 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   setIsOpenMobile,
   computersCount = 6,
+  onOpenDmeModal,
 }) => {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [isZipping, setIsZipping] = useState(false);
@@ -242,6 +246,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="p-1 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded transition"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Healthcare DME & Mr. BAZ AMAR Project Badge */}
+          <div className="mx-3 my-2.5 p-2.5 rounded-xl bg-gradient-to-r from-emerald-950/50 via-slate-900 to-cyan-950/50 border border-emerald-800/40 shadow-sm flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 text-emerald-400">
+                <HeartPulse className="w-3.5 h-3.5 animate-pulse" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold text-slate-100 truncate">
+                  Mr. BAZ AMAR
+                </div>
+                <div className="text-[10px] text-cyan-400 font-mono truncate">
+                  CHU Béni Messous (10-2026)
+                </div>
+              </div>
+            </div>
+            {onOpenDmeModal && (
+              <button
+                onClick={onOpenDmeModal}
+                className="px-2 py-1 rounded-lg text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition shrink-0 cursor-pointer"
+                title="Présentation du projet DME & Authentification"
+              >
+                DME Santé
               </button>
             )}
           </div>

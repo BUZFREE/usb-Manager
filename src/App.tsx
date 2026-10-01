@@ -16,6 +16,7 @@ import { WhitelistView } from './components/WhitelistView';
 import { UsbAuditView } from './components/UsbAuditView';
 import { ReportsPrintCenterView } from './components/ReportsPrintCenterView';
 import { WifiMikrotikView } from './components/WifiMikrotikView';
+import { DmeWelcomeModal, DmeUserSession } from './components/DmeWelcomeModal';
 import { PolicyMode, NetworkComputer, DeploymentLog } from './types/usbPolicy';
 import { Shield, CheckCircle2 } from 'lucide-react';
 
@@ -26,6 +27,33 @@ export default function App() {
   const [lastAppliedTime, setLastAppliedTime] = useState<string>(
     new Date().toLocaleTimeString('fr-FR')
   );
+
+  // DME Healthcare Session & Welcome Modal State (Created by Mr. BAZ AMAR CHU Béni Messous Alger 10-2026)
+  const [dmeSession, setDmeSession] = useState<DmeUserSession>(() => {
+    try {
+      const saved = localStorage.getItem('winlock_dme_auth_session');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      email: 'issaadhassani@gmail.com',
+      fullName: 'Mr. BAZ AMAR',
+      hospital: 'CHU Béni Messous - Alger',
+      role: 'Informaticien Santé / DSI DME',
+      connectedAt: '',
+      isAuthenticated: false,
+    };
+  });
+
+  const [isDmeModalOpen, setIsDmeModalOpen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('winlock_dme_auth_session');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return !parsed.isAuthenticated;
+      }
+    } catch {}
+    return true; // Foreground presentation open by default
+  });
 
   // Network fleet state with real Hostnames, IP addresses, MAC addresses, and NIC adapters
   const [computers, setComputers] = useState<NetworkComputer[]>([
@@ -166,6 +194,7 @@ export default function App() {
         isOpenMobile={isMobileSidebarOpen}
         setIsOpenMobile={setIsMobileSidebarOpen}
         computersCount={computers.length}
+        onOpenDmeModal={() => setIsDmeModalOpen(true)}
       />
 
       {/* Main Content Area (offset by sidebar width on desktop) */}
@@ -177,6 +206,8 @@ export default function App() {
           policyMode={policyMode}
           onRefreshStatus={() => setLastAppliedTime(new Date().toLocaleTimeString('fr-FR'))}
           onToggleSidebarMobile={() => setIsMobileSidebarOpen((prev) => !prev)}
+          onOpenDmeModal={() => setIsDmeModalOpen(true)}
+          connectedUser={dmeSession}
         />
 
         {/* View Content */}
@@ -230,11 +261,13 @@ export default function App() {
         {/* Footer */}
         <footer className="border-t border-slate-900 bg-slate-950/80 py-6 mt-12 text-xs text-slate-500">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Shield className="w-4 h-4 text-cyan-400" />
-              <span className="text-slate-300 font-medium">WinLock USB & GPO Manager</span>
+              <span className="text-slate-300 font-medium">WinLock Santé & Sécurisation DME</span>
               <span>—</span>
-              <span>Suite Python 3.12 (winreg, ctypes Win32, pywin32, WMI) pour Windows 10, 11 et Windows Server</span>
+              <span className="text-cyan-400">Créé par Mr. BAZ AMAR (CHU Béni Messous Alger, 10-2026)</span>
+              <span>•</span>
+              <span>Utilisation libre pour tous les informaticiens de la santé</span>
             </div>
 
             <div className="flex items-center gap-4 text-slate-400">
@@ -243,11 +276,24 @@ export default function App() {
                 Souris & Clavier HID Inviolables
               </span>
               <span>•</span>
-              <span>Watchdog en temps réel & Forensics intégrés</span>
+              <button
+                onClick={() => setIsDmeModalOpen(true)}
+                className="text-cyan-400 hover:text-cyan-300 underline font-medium cursor-pointer"
+              >
+                À propos du Projet DME
+              </button>
             </div>
           </div>
         </footer>
       </div>
+
+      {/* Foreground Modal: Official Presentation by Mr. BAZ AMAR & Healthcare Email Login */}
+      <DmeWelcomeModal
+        isOpen={isDmeModalOpen}
+        onClose={() => setIsDmeModalOpen(false)}
+        onSaveSession={(sess) => setDmeSession(sess)}
+        currentSession={dmeSession}
+      />
     </div>
   );
 }
